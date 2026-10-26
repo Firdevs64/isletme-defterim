@@ -134,7 +134,7 @@ function Auth() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-logo">
-          <img src="/logo.png" alt="Grafix" />
+          <img src="/logo.png" alt="İşletme Defterim" />
         </div>
 
         <div className="auth-heading">
@@ -203,7 +203,7 @@ function Auth() {
                 <input
                   type="text"
                   name="businessName"
-                  placeholder="Örn. Grafix Reklam"
+                  placeholder="Örn. Yılmaz Ticaret"
                   value={form.businessName}
                   onChange={handleChange}
                 />

@@ -16,8 +16,9 @@ export default defineConfig({
         description:
           "Müşteri, iş, tahsilat ve gider takibi için işletme defteri.",
 
-        theme_color: "#24272b",
-        background_color: "#f3f4f5",
+        theme_color: "#007384",
+        background_color: "#f4f6f8",
+        categories: ["business", "finance"],
 
         display: "standalone",
         start_url: "/",

@@ -77,7 +77,7 @@ function Profile({
           İşletme Adı
           <input
             type="text"
-            placeholder="Örn. Grafix Ajans"
+            placeholder="Örn. Yılmaz Ticaret"
             value={form.businessName}
             onChange={(e) =>
               setForm({
