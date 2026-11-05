@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 
 function Profile({
   profile,
@@ -114,14 +114,6 @@ function Profile({
           Bilgileri Kaydet
         </button>
       </form>
-
-      <div className="profile-cloud-note">
-        <strong>☁️ Hesabınız Firebase ile senkronize ediliyor</strong>
-        <span>
-          Aynı hesapla farklı cihazlardan giriş yaptığınızda
-          profil bilgilerinize erişebilirsiniz.
-        </span>
-      </div>
 
       <button
         type="button"

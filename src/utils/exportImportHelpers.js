@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
    exportImportHelpers.js — Veri Dışa / İçe Aktar Yardımcıları
    - Excel / CSV formatında İşlemler ve Cariler
    - Tam JSON Yedekleme & Geri Yükleme
@@ -159,7 +159,7 @@ export function exportCustomersToCSV(customerRecords = [], transactions = []) {
  */
 export function exportFullBackupJSON(transactions = [], customerRecords = [], profile = {}) {
   const backupData = {
-    appName: "İşletme Defterim",
+    appName: "İşletme Defteri",
     appVersion: "1.0.0",
     exportedAt: new Date().toISOString(),
     profile: {

@@ -1,5 +1,5 @@
-/* ============================================================
-   App.jsx — İşletme Defterim
+﻿/* ============================================================
+   App.jsx — İşletme Defteri
    Firebase Auth + Firestore entegrasyonu
    Mevcut veriler (job/payment/expense) backward-compatible korundu
 ============================================================ */
@@ -34,6 +34,7 @@ import MenuPage from "./pages/MenuPage";
 import Profile from "./pages/Profile";
 import Auth from "./components/Auth";
 import BottomNav from "./components/BottomNav";
+import Sidebar from "./components/Sidebar";
 
 function App() {
   /* ---- Auth State ---- */
@@ -89,11 +90,15 @@ function App() {
 
   /* ========== TRANSACTIONS LISTENER ========== */
   useEffect(() => {
-    if (!user) { setTransactions([]); setTransactionsLoading(false); return; }
+    if (!user) {
+      setTransactions([]);
+      setTransactionsLoading(false);
+      return;
+    }
     setTransactionsLoading(true);
     const q = query(
       collection(db, "users", user.uid, "transactions"),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
     );
     const unsub = onSnapshot(
       q,
@@ -101,28 +106,34 @@ function App() {
         setTransactions(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
         setTransactionsLoading(false);
       },
-      () => { setTransactions([]); setTransactionsLoading(false); }
+      () => {
+        setTransactions([]);
+        setTransactionsLoading(false);
+      },
     );
     return unsub;
   }, [user]);
-   /* ========== DUE REMINDER CHECK ========== */
-   useEffect(() => {
-     // Trigger due reminder check when transactions change
-     checkAndTriggerDueReminders(transactions);
-   }, [transactions]);
-
+  /* ========== DUE REMINDER CHECK ========== */
+  useEffect(() => {
+    // Trigger due reminder check when transactions change
+    checkAndTriggerDueReminders(transactions);
+  }, [transactions]);
 
   /* ========== CUSTOMERS LISTENER ========== */
   useEffect(() => {
-    if (!user) { setCustomerRecords([]); return; }
+    if (!user) {
+      setCustomerRecords([]);
+      return;
+    }
     const q = query(
       collection(db, "users", user.uid, "customers"),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
     );
     const unsub = onSnapshot(
       q,
-      (snap) => setCustomerRecords(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
-      () => setCustomerRecords([])
+      (snap) =>
+        setCustomerRecords(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      () => setCustomerRecords([]),
     );
     return unsub;
   }, [user]);
@@ -130,7 +141,9 @@ function App() {
   /* ========== CARİ LİSTESİ (dropdown için) ========== */
   const customers = useMemo(() => {
     const savedNames = customerRecords.map((c) => c.name).filter(Boolean);
-    const oldNames = transactions.filter((t) => t.customer).map((t) => t.customer);
+    const oldNames = transactions
+      .filter((t) => t.customer)
+      .map((t) => t.customer);
     return [...new Set([...savedNames, ...oldNames])];
   }, [customerRecords, transactions]);
 
@@ -138,11 +151,17 @@ function App() {
   const handleAddCustomer = async (data) => {
     if (!user) return false;
     const name = data.name?.trim();
-    if (!name) { alert("Ad Soyad / Firma Adı alanını doldurun."); return false; }
+    if (!name) {
+      alert("Ad Soyad / Firma Adı alanını doldurun.");
+      return false;
+    }
     const exists = customers.some(
-      (c) => c.toLocaleLowerCase("tr-TR") === name.toLocaleLowerCase("tr-TR")
+      (c) => c.toLocaleLowerCase("tr-TR") === name.toLocaleLowerCase("tr-TR"),
     );
-    if (exists) { alert("Bu cari zaten kayıtlı."); return false; }
+    if (exists) {
+      alert("Bu cari zaten kayıtlı.");
+      return false;
+    }
     try {
       await addDoc(collection(db, "users", user.uid, "customers"), {
         name,
@@ -155,7 +174,8 @@ function App() {
       });
       return true;
     } catch {
-      alert("Cari kaydedilemedi."); return false;
+      alert("Cari kaydedilemedi.");
+      return false;
     }
   };
 
@@ -188,8 +208,12 @@ function App() {
   };
 
   /* ========== YEDEK İÇE AKTAR ========== */
-  const handleImportBackup = async ({ transactions: importedTxns, customers: importedCusts }) => {
-    if (!user) return { success: false, error: "Kullanıcı oturumu bulunamadı." };
+  const handleImportBackup = async ({
+    transactions: importedTxns,
+    customers: importedCusts,
+  }) => {
+    if (!user)
+      return { success: false, error: "Kullanıcı oturumu bulunamadı." };
     try {
       let tCount = 0;
       let cCount = 0;
@@ -261,9 +285,9 @@ function App() {
     return (
       <div className="splash-screen">
         <div className="splash-logo">
-          <img src="/logo.png" alt="İşletme Defterim" />
+          <img src="/logo.png" alt="İşletme Defteri" />
         </div>
-        <h1 className="splash-title">İşletme Defterim</h1>
+        <h1 className="splash-title">İşletme Defteri</h1>
         <span className="splash-slogan">KOLAYCA TAKİP ET</span>
         <div className="splash-loader" />
       </div>
@@ -275,106 +299,120 @@ function App() {
   if (!profile) {
     return (
       <div className="splash-screen">
-        <span>İşletme Defterim</span>
+        <span>İşletme Defteri</span>
         <strong>Profil yüklenemedi. Sayfayı yenileyin.</strong>
       </div>
     );
   }
 
   /* ========== RENDER ========== */
-  const showNav = !["newTransaction", "quickPayment", "profile"].includes(currentPage);
+  const showNav = !["newTransaction", "quickPayment", "profile"].includes(
+    currentPage,
+  );
 
   return (
-    <div className="app">
+    <div className="app-layout">
+      {/* ---- MASAÜSTÜ SOL SİDEBAR NAVİGASYONU ---- */}
+      <Sidebar
+        currentPage={currentPage}
+        onNavigate={navigate}
+        profile={profile}
+        theme={theme}
+        toggleTheme={toggleTheme}
+      />
 
-      {/* ---- ANA SAYFA ---- */}
-      {currentPage === "home" && (
-        <HomePage
-          profile={profile}
-          transactions={transactions}
-          onNavigate={navigate}
-          onOpenQuickPayment={(type) => navigate("quickPayment", { type })}
-        />
-      )}
+      <div className="app">
+        {/* ---- ANA SAYFA ---- */}
+        {currentPage === "home" && (
+          <HomePage
+            profile={profile}
+            transactions={transactions}
+            onNavigate={navigate}
+            onOpenQuickPayment={(type) => navigate("quickPayment", { type })}
+          />
+        )}
 
-      {/* ---- CARİLER ---- */}
-      {currentPage === "customers" && (
-        <CustomersPage
-          user={user}
-          transactions={transactions}
-          customerRecords={customerRecords}
-          addCustomer={handleAddCustomer}
-          deleteTransaction={deleteTransaction}
-          onNavigate={navigate}
-          onOpenNewTransaction={(params) => navigate("newTransaction", params)}
-        />
-      )}
+        {/* ---- CARİLER ---- */}
+        {currentPage === "customers" && (
+          <CustomersPage
+            user={user}
+            transactions={transactions}
+            customerRecords={customerRecords}
+            addCustomer={handleAddCustomer}
+            deleteTransaction={deleteTransaction}
+            onNavigate={navigate}
+            onOpenNewTransaction={(params) =>
+              navigate("newTransaction", params)
+            }
+          />
+        )}
 
-      {/* ---- İŞLEMLER ---- */}
-      {currentPage === "transactions" && (
-        <TransactionsPage
-          transactions={transactions}
-          deleteTransaction={deleteTransaction}
-          onBack={() => navigate("home")}
-        />
-      )}
+        {/* ---- İŞLEMLER ---- */}
+        {currentPage === "transactions" && (
+          <TransactionsPage
+            transactions={transactions}
+            deleteTransaction={deleteTransaction}
+            onBack={() => navigate("home")}
+          />
+        )}
 
-      {/* ---- YENİ İŞLEM ---- */}
-      {currentPage === "newTransaction" && (
-        <NewTransactionPage
-          user={user}
-          customers={customers}
-          onBack={() => navigate(pageParams.returnTo || "home")}
-          initialType={pageParams.type || "sale"}
-          initialCustomer={pageParams.customer || ""}
-        />
-      )}
+        {/* ---- YENİ İŞLEM ---- */}
+        {currentPage === "newTransaction" && (
+          <NewTransactionPage
+            user={user}
+            customers={customers}
+            onBack={() => navigate(pageParams.returnTo || "home")}
+            initialType={pageParams.type || "sale"}
+            initialCustomer={pageParams.customer || ""}
+          />
+        )}
 
-      {/* ---- HIZLI TAHSİLAT / ÖDEME ---- */}
-      {currentPage === "quickPayment" && (
-        <QuickPaymentPage
-          user={user}
-          customers={customers}
-          initialType={pageParams.type || "collection"}
-          onBack={() => navigate("home")}
-        />
-      )}
+        {/* ---- HIZLI TAHSİLAT / ÖDEME ---- */}
+        {currentPage === "quickPayment" && (
+          <QuickPaymentPage
+            user={user}
+            customers={customers}
+            initialType={pageParams.type || "collection"}
+            onBack={() => navigate("home")}
+          />
+        )}
 
-      {/* ---- RAPORLAR ---- */}
-      {currentPage === "reports" && (
-        <ReportsPage transactions={transactions} />
-      )}
+        {/* ---- RAPORLAR ---- */}
+        {currentPage === "reports" && (
+          <ReportsPage transactions={transactions} />
+        )}
 
-      {/* ---- MENÜ ---- */}
-      {currentPage === "menu" && (
-        <MenuPage
-          profile={profile}
-          user={user}
-          transactions={transactions}
-          customerRecords={customerRecords}
-          customers={customers}
-          theme={theme}
-          toggleTheme={toggleTheme}
-          onImportBackup={handleImportBackup}
-          onNavigate={navigate}
-          onLogout={handleLogout}
-        />
-      )}
+        {/* ---- MENÜ ---- */}
+        {currentPage === "menu" && (
+          <MenuPage
+            profile={profile}
+            user={user}
+            transactions={transactions}
+            customerRecords={customerRecords}
+            customers={customers}
+            theme={theme}
+            toggleTheme={toggleTheme}
+            onImportBackup={handleImportBackup}
+            onNavigate={navigate}
+            onLogout={handleLogout}
+          />
+        )}
 
-      {/* ---- PROFİL ---- */}
-      {currentPage === "profile" && (
-        <Profile
-          profile={profile}
-          onSave={handleProfileSave}
-          onBack={() => navigate("menu")}
-          onLogout={handleLogout}
-        />
-      )}
+        {/* ---- PROFİL ---- */}
+        {currentPage === "profile" && (
+          <Profile
+            profile={profile}
+            onSave={handleProfileSave}
+            onBack={() => navigate("menu")}
+            onLogout={handleLogout}
+          />
+        )}
 
-      {/* ---- ALT NAVİGASYON ---- */}
-      {showNav && (
-        <BottomNav currentPage={currentPage} onNavigate={navigate} />
-      )}
+        {/* ---- MOBİL ALT NAVİGASYON (Sadece mobil/tablet) ---- */}
+        {showNav && (
+          <BottomNav currentPage={currentPage} onNavigate={navigate} />
+        )}
+      </div>
     </div>
   );
 }

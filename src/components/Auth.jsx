@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -134,11 +134,11 @@ function Auth() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-logo">
-          <img src="/logo.png" alt="İşletme Defterim" />
+          <img src="/logo.png" alt="İşletme Defteri" />
         </div>
 
         <div className="auth-heading">
-          <p>İşletme Defterim</p>
+          <p>İşletme Defteri</p>
 
           <h1>
             {mode === "login"

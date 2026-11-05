@@ -207,100 +207,103 @@ function ReportsPage({ transactions }) {
         </div>
       </div>
 
-      {/* Aylık Gelir - Gider Bar Grafik Kartı */}
-      <div className="rapor-chart-card">
-        <div className="rcc-header-line">
-          <strong className="rcc-card-title">Aylık Gelir - Gider</strong>
-          <div className="rcc-legend-box">
-            <span className="rcc-legend-item">
-              <span className="legend-square legend-blue" /> Gelir
-            </span>
-            <span className="rcc-legend-item">
-              <span className="legend-square legend-red" /> Gider
-            </span>
-          </div>
-        </div>
-
-        {/* Grafik Alanı (Y-Ekseni + Bar Çiftleri) */}
-        <div className="barchart-with-axis">
-          {/* Sol Y-Ekseni Etiketleri */}
-          <div className="chart-y-axis">
-            <span>40k</span>
-            <span>30k</span>
-            <span>20k</span>
-            <span>10k</span>
-            <span>0</span>
+      {/* Alt Grafikler & Analiz Grid (Masaüstünde Yan Yana 2 Kolon, Mobilde Doğal Sıralı) */}
+      <div className="rapor-cards-grid">
+        {/* Aylık Gelir - Gider Bar Grafik Kartı */}
+        <div className="rapor-chart-card">
+          <div className="rcc-header-line">
+            <strong className="rcc-card-title">Aylık Gelir - Gider</strong>
+            <div className="rcc-legend-box">
+              <span className="rcc-legend-item">
+                <span className="legend-square legend-blue" /> Gelir
+              </span>
+              <span className="rcc-legend-item">
+                <span className="legend-square legend-red" /> Gider
+              </span>
+            </div>
           </div>
 
-          {/* Barlar */}
-          <div className="chart-bars-area">
-            {monthlyChartData.map((d, idx) => {
-              const incomeHeight = Math.min(100, Math.max(6, (d.income / maxBarValue) * 100));
-              const expenseHeight = Math.min(100, Math.max(6, (d.expense / maxBarValue) * 100));
+          {/* Grafik Alanı (Y-Ekseni + Bar Çiftleri) */}
+          <div className="barchart-with-axis">
+            {/* Sol Y-Ekseni Etiketleri */}
+            <div className="chart-y-axis">
+              <span>40k</span>
+              <span>30k</span>
+              <span>20k</span>
+              <span>10k</span>
+              <span>0</span>
+            </div>
 
-              return (
-                <div key={idx} className="chart-bar-group">
-                  <div className="chart-bars-pair">
-                    <div
-                      className="c-bar c-bar-blue"
-                      style={{ height: `${incomeHeight}%` }}
-                      title={`Gelir: ${formatMoney(d.income)} ₺`}
-                    />
-                    <div
-                      className="c-bar c-bar-red"
-                      style={{ height: `${expenseHeight}%` }}
-                      title={`Gider: ${formatMoney(d.expense)} ₺`}
-                    />
-                  </div>
-                  <span className="chart-bar-month-label">{d.label}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+            {/* Barlar */}
+            <div className="chart-bars-area">
+              {monthlyChartData.map((d, idx) => {
+                const incomeHeight = Math.min(100, Math.max(6, (d.income / maxBarValue) * 100));
+                const expenseHeight = Math.min(100, Math.max(6, (d.expense / maxBarValue) * 100));
 
-      {/* En Çok İşlem Yapılan Cariler Kartı */}
-      <div className="rapor-top-cariler-card">
-        <div className="rcc-header-line">
-          <strong className="rcc-card-title">En Çok İşlem Yapılan Cariler</strong>
-        </div>
-
-        {topCustomers.length === 0 ? (
-          <div className="empty-tab-notice" style={{ padding: "20px 0" }}>
-            <span>Seçilen dönemde işlem yapılmış cari bulunmuyor.</span>
-          </div>
-        ) : (
-          <div className="top-cariler-list">
-            {topCustomers.map((cust, idx) => {
-              const percent = Math.round((cust.total / maxCustTotal) * 100);
-              const isFirst = idx === 0;
-
-              return (
-                <div key={cust.name} className="top-cari-row">
-                  {/* İkon */}
-                  <div className={`top-cari-icon-circle ${isFirst ? "bg-green-soft" : "bg-blue-soft"}`}>
-                    {isFirst ? "🛡️" : "👤"}
-                  </div>
-
-                  {/* İsim & İşlem Sayısı & Progress Bar */}
-                  <div className="top-cari-mid-wrap">
-                    <strong className="top-cari-name">{cust.name}</strong>
-                    <span className="top-cari-count">{cust.count} işlem</span>
-                    <div className="top-cari-progress-bg">
-                      <div className="top-cari-progress-fill" style={{ width: `${percent}%` }} />
+                return (
+                  <div key={idx} className="chart-bar-group">
+                    <div className="chart-bars-pair">
+                      <div
+                        className="c-bar c-bar-blue"
+                        style={{ height: `${incomeHeight}%` }}
+                        title={`Gelir: ${formatMoney(d.income)} ₺`}
+                      />
+                      <div
+                        className="c-bar c-bar-red"
+                        style={{ height: `${expenseHeight}%` }}
+                        title={`Gider: ${formatMoney(d.expense)} ₺`}
+                      />
                     </div>
+                    <span className="chart-bar-month-label">{d.label}</span>
                   </div>
-
-                  {/* Tutar */}
-                  <strong className="top-cari-amount amount-green">
-                    {formatMoney(cust.total)} ₺
-                  </strong>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        )}
+        </div>
+
+        {/* En Çok İşlem Yapılan Cariler Kartı */}
+        <div className="rapor-top-cariler-card">
+          <div className="rcc-header-line">
+            <strong className="rcc-card-title">En Çok İşlem Yapılan Cariler</strong>
+          </div>
+
+          {topCustomers.length === 0 ? (
+            <div className="empty-tab-notice" style={{ padding: "20px 0" }}>
+              <span>Seçilen dönemde işlem yapılmış cari bulunmuyor.</span>
+            </div>
+          ) : (
+            <div className="top-cariler-list">
+              {topCustomers.map((cust, idx) => {
+                const percent = Math.round((cust.total / maxCustTotal) * 100);
+                const isFirst = idx === 0;
+
+                return (
+                  <div key={cust.name} className="top-cari-row">
+                    {/* İkon */}
+                    <div className={`top-cari-icon-circle ${isFirst ? "bg-green-soft" : "bg-blue-soft"}`}>
+                      {isFirst ? "🛡️" : "👤"}
+                    </div>
+
+                    {/* İsim & İşlem Sayısı & Progress Bar */}
+                    <div className="top-cari-mid-wrap">
+                      <strong className="top-cari-name">{cust.name}</strong>
+                      <span className="top-cari-count">{cust.count} işlem</span>
+                      <div className="top-cari-progress-bg">
+                        <div className="top-cari-progress-fill" style={{ width: `${percent}%` }} />
+                      </div>
+                    </div>
+
+                    {/* Tutar */}
+                    <strong className="top-cari-amount amount-green">
+                      {formatMoney(cust.total)} ₺
+                    </strong>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

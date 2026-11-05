@@ -10,8 +10,8 @@ export default defineConfig({
       registerType: "autoUpdate",
 
       manifest: {
-        name: "İşletme Defterim",
-        short_name: "Defterim",
+        name: "İşletme Defteri",
+        short_name: "İşletme Defteri",
 
         description:
           "Müşteri, iş, tahsilat ve gider takibi için işletme defteri.",
@@ -38,10 +38,10 @@ export default defineConfig({
             type: "image/png",
           },
           {
-            src: "/pwa-512x512.png",
+            src: "/pwa-maskable-512x512.png",
             sizes: "512x512",
             type: "image/png",
-            purpose: "any maskable",
+            purpose: "maskable",
           },
         ],
       },

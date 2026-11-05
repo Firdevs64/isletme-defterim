@@ -1,7 +1,7 @@
-/* ============================================================
+﻿/* ============================================================
    HomePage — Referans Ekran 1: Dashboard
    Tam referans tasarıma uygun:
-   - Üst Bölüm: Logo, "İşletme Defterim", "Kolayca Takip Et", Bildirim ve Ayarlar
+   - Üst Bölüm: Logo, "İşletme Defteri", "Kolayca Takip Et", Bildirim ve Ayarlar
    - Genel Durum Kartı: Beyaz kart, "Bu Ay ▾", ₺ Tutar ↗, mini bar grafik
    - 4 Özet Kart: Alacaklar, Borçlar, Bu Ay Satış, Bu Ay Gider
    - Hızlı İşlem: 4 kart (Satış, Alış, Tahsilat, Ödeme)
@@ -98,10 +98,10 @@ function HomePage({ profile, transactions, onNavigate, onOpenQuickPayment }) {
         <div className="home-brand-group">
           {/* Defter Logo İkonu */}
           <div className="home-notebook-icon">
-            <img src="/logo.png" alt="İşletme Defterim" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 8 }} />
+            <img src="/logo.png" alt="İşletme Defteri" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 8 }} />
           </div>
           <div className="home-title-wrap">
-            <h1 className="home-app-title">İşletme Defterim</h1>
+            <h1 className="home-app-title">İşletme Defteri</h1>
             <span className="home-app-subtitle">Kolayca Takip Et</span>
           </div>
         </div>

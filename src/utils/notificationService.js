@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
    notificationService.js — Bildirim & Hatırlatıcı Servisi
    - Web Notification API entegrasyonu (Windows, Android, Mac)
    - Vadesi gelen ve geçen alacak/borçları filtreleme
@@ -171,12 +171,12 @@ export function checkAndTriggerDueReminders(transactions = []) {
     const item = urgent[0];
     const statusMsg = item.status === "today" ? "vadesi bugün!" : `${Math.abs(item.diffDays)} gün gecikti.`;
     sendBrowserNotification(
-      "İşletme Defterim — Vade Hatırlatıcısı",
+      "İşletme Defteri — Vade Hatırlatıcısı",
       `${item.customer} carisine ait ${formatMoney(item.amount)} ₺ ${item.typeLabel.toLowerCase()} ödemesinin ${statusMsg}`
     );
   } else {
     sendBrowserNotification(
-      "İşletme Defterim — Vade Hatırlatıcısı",
+      "İşletme Defteri — Vade Hatırlatıcısı",
       `Dikkat: ${urgent.length} adet işlemin vadesi geldi veya gecikti. Detayları görmek için dokunun.`
     );
   }
@@ -202,7 +202,7 @@ export async function sendTestNotification() {
   await new Promise((resolve) => setTimeout(resolve, 300));
 
   const success = sendBrowserNotification(
-    "İşletme Defterim 🔔",
+    "İşletme Defteri 🔔",
     "Harika! Bildirim sistemi başarıyla aktif edildi. Vadesi gelen ödemeleriniz burada hatırlatılacaktır."
   );
 

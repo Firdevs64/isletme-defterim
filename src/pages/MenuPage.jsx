@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
    MenuPage — Menü, Ayarlar, Veri Yönetimi ve Tema
    - Referans Ekran 9 & Yeni Alt Ekranlar:
      1. Profil Bilgileri
@@ -350,9 +350,7 @@ function MenuPage({
                 >
                   <span className="ios-toggle-thumb" />
                 </button>
-                <button type="button" className="primary-teal-btn" style={{ marginTop: 8 }} onClick={async () => { const success = await sendTestNotification(); if (!success) alert('Bildirim gönderilemedi'); }}>
-                  Test Bildirimi
-                </button>
+
               </div>
 
               <div className="settings-switch-row">
@@ -370,25 +368,12 @@ function MenuPage({
               </div>
             </div>
 
-            {/* Kart 4: Sistem ve Güvenlik Bilgisi */}
+            {/* Kart 4: Uygulama Bilgisi */}
             <div className="settings-section-card">
-              <h2 className="settings-section-title">Sistem & Senkronizasyon</h2>
-              
-              <div className="settings-status-box">
-                <div className="status-indicator-dot online" />
-                <div>
-                  <strong>Bulut Senkronizasyonu Aktif</strong>
-                  <p>Verileriniz anında Google Cloud Firestore ile şifreli senkronize edilir.</p>
-                </div>
-              </div>
-
+              <h2 className="settings-section-title">Uygulama Bilgisi</h2>
               <div className="settings-meta-row">
-                <span>PWA Çevrimdışı Çalışma</span>
-                <strong style={{ color: "var(--green)" }}>Hazır & Aktif</strong>
-              </div>
-              <div className="settings-meta-row">
-                <span>Play Store Sürüm Durumu</span>
-                <strong style={{ color: "var(--primary)" }}>v1.0.0 (Yayıma Hazır)</strong>
+                <span>Sürüm</span>
+                <strong style={{ color: "var(--text-main)" }}>1.0.0</strong>
               </div>
             </div>
 
@@ -702,16 +687,12 @@ function MenuPage({
               <rect x="23" y="2" width="3" height="4" rx="1" fill="#10b981" />
             </svg>
           </div>
-          <h2 style={{ fontSize: 20, margin: "14px 0 4px", color: "var(--text-main)" }}>İşletme Defterim</h2>
-          <span style={{ fontSize: 13, color: "var(--text-sub)" }}>Sürüm 1.0.0 (Google Play Store Ready)</span>
+          <h2 style={{ fontSize: 20, margin: "14px 0 4px", color: "var(--text-main)" }}>İşletme Defteri</h2>
+          <span style={{ fontSize: 13, color: "var(--text-sub)" }}>Sürüm 1.0.0</span>
 
           <p style={{ marginTop: 24, fontSize: 13, color: "var(--text-sub)", lineHeight: 1.6, textAlign: "left" }}>
-            İşletme Defterim, küçük işletmeler ve esnaflar için geliştirilmiş modern, kolay ve profesyonel bir cari ve gelir-gider takip uygulamasıdır.
+            İşletme Defteri, küçük işletmeler ve esnaflar için geliştirilmiş modern, kolay ve profesyonel bir cari ve gelir-gider takip uygulamasıdır.
           </p>
-
-          <div style={{ marginTop: 30, padding: 14, background: "var(--card-subtle)", borderRadius: 12, border: "1px solid var(--border)", fontSize: 12, color: "var(--text-sub)" }}>
-            Google Firebase Cloud Firestore güvencesiyle verileriniz anında ve güvenle senkronize olur.
-          </div>
         </div>
       </div>
     );

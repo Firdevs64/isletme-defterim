@@ -66,7 +66,6 @@ function CustomersPage({
     email: "",
     note: "",
     type: "customer", // customer | supplier | other
-    color: AVATAR_COLORS[0],
   });
   const [savingCustomer, setSavingCustomer] = useState(false);
 
@@ -183,7 +182,6 @@ function CustomersPage({
         email: customerForm.email.trim(),
         note: customerForm.note.trim(),
         type: customerForm.type,
-        color: customerForm.color,
         createdAt: serverTimestamp(),
       });
       setCustomerForm({
@@ -192,7 +190,6 @@ function CustomersPage({
         email: "",
         note: "",
         type: "customer",
-        color: AVATAR_COLORS[0],
       });
       setView("list");
     } catch {
@@ -337,7 +334,6 @@ function CustomersPage({
                 email: c.email,
                 note: c.note,
                 type: c.type,
-                color: c.color,
               });
               setView("new");
             }}
@@ -347,41 +343,46 @@ function CustomersPage({
         </div>
 
         <div className="cari-detail-body">
-          {/* Üst Profil Bölümü */}
-          <div className="cari-detail-profile-card">
-            <div className="cari-big-avatar" style={{ backgroundColor: c.color }}>
-              {getInitials(c.name)}
-            </div>
-            <h2 className="cari-profile-name">{c.name}</h2>
-            <div className="cari-profile-badge">{getCustomerTypeLabel(c.type)}</div>
-            {c.phone && (
-              <div className="cari-profile-phone">
-                <span>📞 {c.phone}</span>
+          {/* Üst Profil & Özet Bakiye Grid (Masaüstünde 2 Kolon, Mobilde Doğal Sıralı) */}
+          <div className="cari-detail-top-grid">
+            {/* Profil Bölümü */}
+            <div className="cari-detail-profile-card">
+              <div className="cari-big-avatar" style={{ backgroundColor: c.color }}>
+                {getInitials(c.name)}
               </div>
-            )}
-            {c.note && (
-              <p className="cari-profile-note-snippet">{c.note}</p>
-            )}
-          </div>
-
-          {/* İki Özet Kutu Yan Yana (Toplam İş & Tahsilat) */}
-          <div className="cari-two-summary-boxes">
-            <div className="cari-summary-box">
-              <span className="csb-label">Toplam İş</span>
-              <strong className="csb-value">{formatMoney(c.totalSales)} ₺</strong>
+              <h2 className="cari-profile-name">{c.name}</h2>
+              <div className="cari-profile-badge">{getCustomerTypeLabel(c.type)}</div>
+              {c.phone && (
+                <div className="cari-profile-phone">
+                  <span>📞 {c.phone}</span>
+                </div>
+              )}
+              {c.note && (
+                <p className="cari-profile-note-snippet">{c.note}</p>
+              )}
             </div>
-            <div className="cari-summary-box">
-              <span className="csb-label">Tahsilat</span>
-              <strong className="csb-value">{formatMoney(c.totalCollections)} ₺</strong>
-            </div>
-          </div>
 
-          {/* Büyük Kalan Alacak / Borç Kartı */}
-          <div className="cari-big-balance-card">
-            <span className="cbb-label">{isAlacakli ? "Kalan Alacak" : "Kalan Borç"}</span>
-            <strong className={`cbb-amount ${isAlacakli ? "amount-green" : "amount-red"}`}>
-              {formatMoney(Math.abs(c.balance))} ₺
-            </strong>
+            <div className="cari-detail-balances-group">
+              {/* İki Özet Kutu Yan Yana (Toplam İş & Tahsilat) */}
+              <div className="cari-two-summary-boxes">
+                <div className="cari-summary-box">
+                  <span className="csb-label">Toplam İş</span>
+                  <strong className="csb-value">{formatMoney(c.totalSales)} ₺</strong>
+                </div>
+                <div className="cari-summary-box">
+                  <span className="csb-label">Tahsilat</span>
+                  <strong className="csb-value">{formatMoney(c.totalCollections)} ₺</strong>
+                </div>
+              </div>
+
+              {/* Büyük Kalan Alacak / Borç Kartı */}
+              <div className="cari-big-balance-card">
+                <span className="cbb-label">{isAlacakli ? "Kalan Alacak" : "Kalan Borç"}</span>
+                <strong className={`cbb-amount ${isAlacakli ? "amount-green" : "amount-red"}`}>
+                  {formatMoney(Math.abs(c.balance))} ₺
+                </strong>
+              </div>
+            </div>
           </div>
 
           {/* Sekmeler: İşlemler | Notlar | Bilgiler */}
@@ -657,31 +658,6 @@ function CustomersPage({
                 onChange={(e) => setCustomerForm({ ...customerForm, note: e.target.value })}
               />
               <span className="field-char-counter">{customerForm.note.length}/500</span>
-            </div>
-
-            {/* Renk / Simge */}
-            <div className="field-group">
-              <label className="field-label">Renk / Simge</label>
-              <div className="color-dots-row">
-                {AVATAR_COLORS.map((col) => {
-                  const isSelected = customerForm.color === col;
-                  return (
-                    <button
-                      type="button"
-                      key={col}
-                      className={`color-choice-circle ${isSelected ? "selected" : ""}`}
-                      style={{ backgroundColor: col }}
-                      onClick={() => setCustomerForm({ ...customerForm, color: col })}
-                    >
-                      {isSelected && (
-                        <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
             </div>
 
             <button type="submit" className="primary-teal-btn" disabled={savingCustomer}>
