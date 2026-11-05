@@ -10,10 +10,9 @@
    - Adet & Birim Fiyat (₺) Yan Yana
    - Toplam Tutar Kutusu (Yeşil Büyük Rakam)
    - Açıklama
-   - Fotoğraf Ekle (Opsiyonel) Butonu
    - Kaydet Butonu (Teal)
 ============================================================ */
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import {
@@ -90,7 +89,6 @@ function NewTransactionPage({
   initialCustomer = "",
 }) {
   const today = getToday();
-  const fileInputRef = useRef(null);
 
   // İşlem Türü (Varsayılan Satış)
   const [selectedType, setSelectedType] = useState(initialType || "sale");
@@ -107,7 +105,6 @@ function NewTransactionPage({
     description: "",
   });
 
-  const [photoName, setPhotoName] = useState("");
   const [saving, setSaving] = useState(false);
 
   /* ---- Toplam Tutar Hesapla (Adet/m² × Birim Fiyat veya Sabit) ---- */
@@ -158,7 +155,6 @@ function NewTransactionPage({
         amount: finalAmount,
         date: form.date,
         description: form.description.trim(),
-        photoName: photoName || null,
         createdAt: serverTimestamp(),
       };
 
@@ -168,12 +164,6 @@ function NewTransactionPage({
       alert("İşlem kaydedilemedi. Lütfen tekrar deneyin.");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handlePhotoSelect = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setPhotoName(e.target.files[0].name);
     }
   };
 
@@ -365,25 +355,6 @@ function NewTransactionPage({
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
-          </div>
-
-          {/* Fotoğraf Ekle (Opsiyonel) Butonu */}
-          <div className="photo-upload-row">
-            <input
-              type="file"
-              accept="image/*"
-              ref={fileInputRef}
-              style={{ display: "none" }}
-              onChange={handlePhotoSelect}
-            />
-            <button
-              type="button"
-              className="photo-upload-btn"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <span className="photo-cam-icon">📷</span>
-              <span>{photoName ? `Fotoğraf: ${photoName}` : "Fotoğraf Ekle (Opsiyonel)"}</span>
-            </button>
           </div>
 
           {/* Kaydet Butonu */}

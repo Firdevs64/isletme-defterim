@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    App.jsx — İşletme Defteri
    Firebase Auth + Firestore entegrasyonu
    Mevcut veriler (job/payment/expense) backward-compatible korundu
@@ -46,6 +46,11 @@ function App() {
   /* ---- Sayfa yönetimi ---- */
   const [currentPage, setCurrentPage] = useState("home");
   const [pageParams, setPageParams] = useState({});
+
+  /* ---- Belge Başlığı (PWA & Tarayıcı) ---- */
+  useEffect(() => {
+    document.title = "İşletme Defteri";
+  }, []);
 
   /* ---- Tema (Açık / Koyu) ---- */
   const [theme, setTheme] = useState(() => {
