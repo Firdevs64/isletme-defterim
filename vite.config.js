@@ -50,6 +50,8 @@ export default defineConfig({
         globPatterns: [
           "**/*.{js,css,html,ico,png,svg}",
         ],
+        globIgnores: ["**/showcase-banner.png"],
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },
 
       /*
