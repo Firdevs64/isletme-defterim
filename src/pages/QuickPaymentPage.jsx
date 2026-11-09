@@ -109,7 +109,6 @@ function QuickPaymentPage({
               <input
                 type="text"
                 className="field-text-input"
-                placeholder="Sezgin Arı Medya"
                 value={form.customer}
                 onChange={(e) => setForm({ ...form, customer: e.target.value })}
                 list="qp-cust-datalist"

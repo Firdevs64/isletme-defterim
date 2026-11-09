@@ -192,7 +192,6 @@ function Auth() {
                 <input
                   type="text"
                   name="fullName"
-                  placeholder="Adınız Soyadınız"
                   value={form.fullName}
                   onChange={handleChange}
                 />
@@ -203,7 +202,6 @@ function Auth() {
                 <input
                   type="text"
                   name="businessName"
-                  placeholder="Örn. Yılmaz Ticaret"
                   value={form.businessName}
                   onChange={handleChange}
                 />
@@ -216,7 +214,6 @@ function Auth() {
             <input
               type="email"
               name="email"
-              placeholder="ornek@email.com"
               value={form.email}
               onChange={handleChange}
               autoComplete="email"

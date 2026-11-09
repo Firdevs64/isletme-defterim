@@ -261,7 +261,6 @@ function CustomersPage({
               <input
                 type="text"
                 className="field-text-input"
-                placeholder="Örn. Telefon görüşmesi"
                 value={noteForm.title}
                 onChange={(e) => setNoteForm({ ...noteForm, title: e.target.value })}
               />
@@ -273,7 +272,6 @@ function CustomersPage({
               <textarea
                 className="field-textarea-input"
                 rows={5}
-                placeholder="Tabela için aradı. Önümüzdeki hafta ölçü alınacak. WhatsApp'tan görsel gönderecek."
                 value={noteForm.note}
                 maxLength={500}
                 onChange={(e) => setNoteForm({ ...noteForm, note: e.target.value })}
@@ -613,7 +611,6 @@ function CustomersPage({
               <input
                 type="text"
                 className="field-text-input"
-                placeholder="Mehmet Yılmaz"
                 value={customerForm.name}
                 onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })}
                 required
@@ -626,7 +623,6 @@ function CustomersPage({
               <input
                 type="tel"
                 className="field-text-input"
-                placeholder="0532 123 45 67"
                 value={customerForm.phone}
                 onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })}
               />
@@ -640,7 +636,6 @@ function CustomersPage({
               <input
                 type="email"
                 className="field-text-input"
-                placeholder="mehmet@example.com"
                 value={customerForm.email}
                 onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })}
               />
@@ -652,7 +647,6 @@ function CustomersPage({
               <textarea
                 className="field-textarea-input"
                 rows={3}
-                placeholder="Tabela için aradı. Teklif verilecek."
                 value={customerForm.note}
                 maxLength={500}
                 onChange={(e) => setCustomerForm({ ...customerForm, note: e.target.value })}

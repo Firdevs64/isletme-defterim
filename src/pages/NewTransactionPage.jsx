@@ -212,7 +212,6 @@ function NewTransactionPage({
               <input
                 type="text"
                 className="field-text-input"
-                placeholder="Sezgin Arı Medya"
                 value={form.customer}
                 onChange={(e) => setForm({ ...form, customer: e.target.value })}
                 list="nt-customers-datalist"
@@ -256,7 +255,6 @@ function NewTransactionPage({
               <input
                 type="text"
                 className="field-text-input"
-                placeholder={selectedType === "sale" ? "Tabela çalışması" : "Örn. Malzeme alımı"}
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
                 required
@@ -351,7 +349,6 @@ function NewTransactionPage({
             <textarea
               className="field-textarea-input"
               rows={2}
-              placeholder="Branda"
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />

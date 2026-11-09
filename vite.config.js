@@ -59,21 +59,21 @@ export default defineConfig({
         ],
       },
 
-      workbox: {
-        globPatterns: [
-          "**/*.{js,css,html,ico,png,svg}",
-        ],
-        globIgnores: ["**/showcase-banner.png"],
-        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
-      },
+workbox: {
+  // JS, CSS ve görseller önbellekte tutulabilir.
+  // HTML'i precache'e almıyoruz; böylece her açılışta
+  // Netlify'daki güncel sayfa alınır.
+  globPatterns: [
+    "**/*.{js,css,ico,png,svg}",
+  ],
 
-      /*
-       * Geliştirme sırasında Service Worker'ı kapatıyoruz.
-       * Production build'de PWA yine oluşturulacak.
-       */
-      devOptions: {
-        enabled: false,
-      },
+  globIgnores: ["**/showcase-banner.png"],
+
+  maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+
+  // Sayfa geçişlerinde önce internetten güncel HTML'i almaya çalış.
+  navigateFallback: null,
+},
     }),
   ],
 });

@@ -62,7 +62,6 @@ function Profile({
           Ad Soyad
           <input
             type="text"
-            placeholder="Adınız Soyadınız"
             value={form.fullName}
             onChange={(e) =>
               setForm({
@@ -77,7 +76,6 @@ function Profile({
           İşletme Adı
           <input
             type="text"
-            placeholder="Örn. Yılmaz Ticaret"
             value={form.businessName}
             onChange={(e) =>
               setForm({
