@@ -26,3 +26,25 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+# Android / Capacitor build outputs
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+
+# Android signing / keystore files
+*.jks
+*.keystore
+
+# Generated Android packages
+*.apk
+*.aab
+
+# Temporary APK inspection files
+installed-apk/
+installed-base.apk
+installed-base.zip
+
+# Temporary Android inspection files
+android/app-debug-check/
+android/app-debug-check.zip

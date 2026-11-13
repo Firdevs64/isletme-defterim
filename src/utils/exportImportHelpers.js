@@ -38,10 +38,9 @@ function escapeCSV(val) {
  * 1. İşlemleri Excel / CSV Olarak Dışa Aktar
  */
 export function exportTransactionsToCSV(transactions = []) {
-  if (!transactions.length) {
-    alert("Dışa aktarılacak işlem bulunamadı.");
-    return false;
-  }
+if (!transactions.length) {
+  return false;
+}
 
   // UTF-8 BOM (\uFEFF) Excel'in Türkçe karakterleri tanıması için gereklidir
   const BOM = "\uFEFF";
@@ -75,10 +74,9 @@ export function exportTransactionsToCSV(transactions = []) {
  * 2. Carileri Excel / CSV Olarak Dışa Aktar
  */
 export function exportCustomersToCSV(customerRecords = [], transactions = []) {
-  if (!customerRecords.length && !transactions.length) {
-    alert("Dışa aktarılacak cari bulunamadı.");
-    return false;
-  }
+if (!customerRecords.length && !transactions.length) {
+  return false;
+}
 
   // Cari isimlerini topla
   const customerMap = new Map();

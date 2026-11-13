@@ -11,7 +11,11 @@
      8. Çıkış Yap
 ============================================================ */
 import { useState, useRef } from "react";
-import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
+import {
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+} from "firebase/auth";
 import { auth } from "../firebase";
 import { getAppSettings, saveAppSettings } from "../utils/appSettings";
 import {
@@ -22,7 +26,7 @@ import {
   parseCustomersCSVFile,
 } from "../utils/exportImportHelpers";
 import { formatDateTime } from "../utils/transactionHelpers";
-import { sendTestNotification } from "../utils/notificationService";
+import { useAppDialog } from "../components/AppDialog";
 
 function MenuPage({
   profile,
@@ -36,6 +40,7 @@ function MenuPage({
   onNavigate,
   onLogout,
 }) {
+  const { showAlert } = useAppDialog();
   // Alt ekran state'leri
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
@@ -84,14 +89,20 @@ function MenuPage({
 
     setPwLoading(true);
     try {
-      const credential = EmailAuthProvider.credential(user.email, pwForm.current);
+      const credential = EmailAuthProvider.credential(
+        user.email,
+        pwForm.current,
+      );
       await reauthenticateWithCredential(auth.currentUser, credential);
       await updatePassword(auth.currentUser, pwForm.next);
       setPwSuccess(true);
       setPwForm({ current: "", next: "", next2: "" });
       setTimeout(() => setShowChangePassword(false), 1800);
     } catch (err) {
-      if (err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
+      if (
+        err.code === "auth/wrong-password" ||
+        err.code === "auth/invalid-credential"
+      ) {
         setPwError("Mevcut şifrenizi yanlış girdiniz.");
       } else {
         setPwError("Şifre güncellenirken bir hata oluştu.");
@@ -188,8 +199,19 @@ function MenuPage({
     return (
       <div className="page sub-page menu-sub-page">
         <div className="custom-sub-header">
-          <button type="button" className="sub-header-back-btn" onClick={() => setShowChangePassword(false)}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <button
+            type="button"
+            className="sub-header-back-btn"
+            onClick={() => setShowChangePassword(false)}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <line x1="19" y1="12" x2="5" y2="12" />
               <polyline points="12 19 5 12 12 5" />
             </svg>
@@ -206,7 +228,9 @@ function MenuPage({
                 className="field-text-input"
                 placeholder="••••••••"
                 value={pwForm.current}
-                onChange={(e) => setPwForm({ ...pwForm, current: e.target.value })}
+                onChange={(e) =>
+                  setPwForm({ ...pwForm, current: e.target.value })
+                }
                 required
               />
             </div>
@@ -230,15 +254,25 @@ function MenuPage({
                 className="field-text-input"
                 placeholder="••••••••"
                 value={pwForm.next2}
-                onChange={(e) => setPwForm({ ...pwForm, next2: e.target.value })}
+                onChange={(e) =>
+                  setPwForm({ ...pwForm, next2: e.target.value })
+                }
                 required
               />
             </div>
 
             {pwError && <div className="form-error-banner">{pwError}</div>}
-            {pwSuccess && <div className="form-success-banner">✓ Şifreniz başarıyla değiştirildi!</div>}
+            {pwSuccess && (
+              <div className="form-success-banner">
+                ✓ Şifreniz başarıyla değiştirildi!
+              </div>
+            )}
 
-            <button type="submit" className="primary-teal-btn" disabled={pwLoading}>
+            <button
+              type="submit"
+              className="primary-teal-btn"
+              disabled={pwLoading}
+            >
               {pwLoading ? "Güncelleniyor..." : "Şifreyi Güncelle"}
             </button>
           </form>
@@ -254,8 +288,19 @@ function MenuPage({
     return (
       <div className="page sub-page menu-sub-page">
         <div className="custom-sub-header">
-          <button type="button" className="sub-header-back-btn" onClick={() => setShowAppSettings(false)}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <button
+            type="button"
+            className="sub-header-back-btn"
+            onClick={() => setShowAppSettings(false)}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <line x1="19" y1="12" x2="5" y2="12" />
               <polyline points="12 19 5 12 12 5" />
             </svg>
@@ -265,17 +310,18 @@ function MenuPage({
 
         <div className="screen-form-container">
           <form onSubmit={handleSaveSettings} className="standard-app-form">
-            
             {/* Kart 1: Finans ve Para Birimi */}
             <div className="settings-section-card">
               <h2 className="settings-section-title">Para Birimi & Finans</h2>
-              
+
               <div className="field-group">
                 <label className="field-label">Varsayılan Para Birimi</label>
                 <select
                   className="field-text-input"
                   value={settings.currency}
-                  onChange={(e) => setSettings({ ...settings, currency: e.target.value })}
+                  onChange={(e) =>
+                    setSettings({ ...settings, currency: e.target.value })
+                  }
                 >
                   <option value="₺">Türk Lirası (₺)</option>
                   <option value="$">Amerikan Doları ($)</option>
@@ -285,11 +331,18 @@ function MenuPage({
               </div>
 
               <div className="field-group">
-                <label className="field-label">Varsayılan Vade Süresi (Gün)</label>
+                <label className="field-label">
+                  Varsayılan Vade Süresi (Gün)
+                </label>
                 <select
                   className="field-text-input"
                   value={settings.defaultDueDateDays}
-                  onChange={(e) => setSettings({ ...settings, defaultDueDateDays: Number(e.target.value) })}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      defaultDueDateDays: Number(e.target.value),
+                    })
+                  }
                 >
                   <option value={7}>7 Gün (1 Hafta)</option>
                   <option value={15}>15 Gün</option>
@@ -303,14 +356,20 @@ function MenuPage({
 
             {/* Kart 2: İşlem ve Arayüz Tercihleri */}
             <div className="settings-section-card">
-              <h2 className="settings-section-title">İşlem ve Arayüz Tercihleri</h2>
+              <h2 className="settings-section-title">
+                İşlem ve Arayüz Tercihleri
+              </h2>
 
               <div className="field-group">
-                <label className="field-label">Yeni İşlemde Varsayılan Tür</label>
+                <label className="field-label">
+                  Yeni İşlemde Varsayılan Tür
+                </label>
                 <select
                   className="field-text-input"
                   value={settings.defaultTxnType}
-                  onChange={(e) => setSettings({ ...settings, defaultTxnType: e.target.value })}
+                  onChange={(e) =>
+                    setSettings({ ...settings, defaultTxnType: e.target.value })
+                  }
                 >
                   <option value="sale">Satış (Alacak Kaydı)</option>
                   <option value="purchase">Alış (Borç Kaydı)</option>
@@ -322,12 +381,19 @@ function MenuPage({
               <div className="settings-switch-row">
                 <div className="settings-switch-info">
                   <strong>Hızlı Tutar Butonları</strong>
-                  <span>Hızlı ödemede 50₺, 100₺, 500₺ vb. hazır tuşları göster</span>
+                  <span>
+                    Hızlı ödemede 50₺, 100₺, 500₺ vb. hazır tuşları göster
+                  </span>
                 </div>
                 <button
                   type="button"
                   className={`ios-toggle-switch ${settings.quickAmountChips ? "checked" : ""}`}
-                  onClick={() => setSettings({ ...settings, quickAmountChips: !settings.quickAmountChips })}
+                  onClick={() =>
+                    setSettings({
+                      ...settings,
+                      quickAmountChips: !settings.quickAmountChips,
+                    })
+                  }
                 >
                   <span className="ios-toggle-thumb" />
                 </button>
@@ -336,32 +402,26 @@ function MenuPage({
 
             {/* Kart 3: Bildirimler & Hatırlatıcılar */}
             <div className="settings-section-card">
-              <h2 className="settings-section-title">Bildirimler & Hatırlatmalar</h2>
+              <h2 className="settings-section-title">
+                Bildirimler & Hatırlatmalar
+              </h2>
 
               <div className="settings-switch-row">
                 <div className="settings-switch-info">
                   <strong>Vade Hatırlatıcısı</strong>
-                  <span>Günü yaklaşan veya geçen alacak/borçlar için uyarı ver</span>
+                  <span>
+                    Günü yaklaşan veya geçen alacak/borçlar için uyarı ver
+                  </span>
                 </div>
                 <button
                   type="button"
                   className={`ios-toggle-switch ${settings.dueReminders ? "checked" : ""}`}
-                  onClick={() => setSettings({ ...settings, dueReminders: !settings.dueReminders })}
-                >
-                  <span className="ios-toggle-thumb" />
-                </button>
-
-              </div>
-
-              <div className="settings-switch-row">
-                <div className="settings-switch-info">
-                  <strong>Gün Sonu Özeti</strong>
-                  <span>Akşam saatlerinde günün kasa ve işlem özetini hatırla</span>
-                </div>
-                <button
-                  type="button"
-                  className={`ios-toggle-switch ${settings.endOfDayReminder ? "checked" : ""}`}
-                  onClick={() => setSettings({ ...settings, endOfDayReminder: !settings.endOfDayReminder })}
+                  onClick={() =>
+                    setSettings({
+                      ...settings,
+                      dueReminders: !settings.dueReminders,
+                    })
+                  }
                 >
                   <span className="ios-toggle-thumb" />
                 </button>
@@ -373,7 +433,7 @@ function MenuPage({
               <h2 className="settings-section-title">Uygulama Bilgisi</h2>
               <div className="settings-meta-row">
                 <span>Sürüm</span>
-                <strong style={{ color: "var(--text-main)" }}>1.0.0</strong>
+                <strong style={{ color: "var(--text-main)" }}>1.0.1</strong>
               </div>
             </div>
 
@@ -383,7 +443,11 @@ function MenuPage({
               </div>
             )}
 
-            <button type="submit" className="primary-teal-btn" style={{ marginTop: 8 }}>
+            <button
+              type="submit"
+              className="primary-teal-btn"
+              style={{ marginTop: 8 }}
+            >
               Ayarları Kaydet
             </button>
           </form>
@@ -399,8 +463,19 @@ function MenuPage({
     return (
       <div className="page sub-page menu-sub-page">
         <div className="custom-sub-header">
-          <button type="button" className="sub-header-back-btn" onClick={() => setShowDataExportImport(false)}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <button
+            type="button"
+            className="sub-header-back-btn"
+            onClick={() => setShowDataExportImport(false)}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <line x1="19" y1="12" x2="5" y2="12" />
               <polyline points="12 19 5 12 12 5" />
             </svg>
@@ -430,12 +505,21 @@ function MenuPage({
           {/* ---- DIŞA AKTARMA TABI ---- */}
           {dataTab === "export" && (
             <div className="data-export-cards-stack">
-              
               {/* Kart 1: İşlemleri Excel/CSV İndir */}
               <div className="data-action-card">
                 <div className="data-card-header">
-                  <div className="data-icon-wrap" style={{ background: "#eafaf1", color: "#10b981" }}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <div
+                    className="data-icon-wrap"
+                    style={{ background: "#eafaf1", color: "#10b981" }}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                       <polyline points="14 2 14 8 20 8" />
                       <line x1="16" y1="13" x2="8" y2="13" />
@@ -445,16 +529,37 @@ function MenuPage({
                   </div>
                   <div className="data-card-info">
                     <strong>İşlemleri İndir (Excel / CSV)</strong>
-                    <span>Tüm satış, alış, tahsilat ve ödeme hareketleri tablo formatında.</span>
+                    <span>
+                      Tüm satış, alış, tahsilat ve ödeme hareketleri tablo
+                      formatında.
+                    </span>
                   </div>
-                  <span className="data-badge">{transactions.length} İşlem</span>
+                  <span className="data-badge">
+                    {transactions.length} İşlem
+                  </span>
                 </div>
                 <button
                   type="button"
                   className="data-export-btn"
-                  onClick={() => exportTransactionsToCSV(transactions)}
+                  onClick={async () => {
+                    const success = exportTransactionsToCSV(transactions);
+
+                    if (!success) {
+                      await showAlert("Dışa aktarılacak işlem bulunamadı.", {
+                        title: "Veri Bulunamadı",
+                      });
+                    }
+                  }}
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ width: 16, height: 16 }}
+                  >
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="7 10 12 15 17 10" />
                     <line x1="12" y1="15" x2="12" y2="3" />
@@ -466,8 +571,18 @@ function MenuPage({
               {/* Kart 2: Carileri Excel/CSV İndir */}
               <div className="data-action-card">
                 <div className="data-card-header">
-                  <div className="data-icon-wrap" style={{ background: "#eff6ff", color: "#0284c7" }}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <div
+                    className="data-icon-wrap"
+                    style={{ background: "#eff6ff", color: "#0284c7" }}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                       <circle cx="9" cy="7" r="4" />
                       <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -476,16 +591,40 @@ function MenuPage({
                   </div>
                   <div className="data-card-info">
                     <strong>Cari Listesini İndir (Excel / CSV)</strong>
-                    <span>Müşteri ve tedarikçilerinizin iletişim bilgileri ve bakiyeleri.</span>
+                    <span>
+                      Müşteri ve tedarikçilerinizin iletişim bilgileri ve
+                      bakiyeleri.
+                    </span>
                   </div>
-                  <span className="data-badge">{customerRecords.length || customers.length} Cari</span>
+                  <span className="data-badge">
+                    {customerRecords.length || customers.length} Cari
+                  </span>
                 </div>
                 <button
                   type="button"
                   className="data-export-btn"
-                  onClick={() => exportCustomersToCSV(customerRecords, transactions)}
+                  onClick={async () => {
+                    const success = exportCustomersToCSV(
+                      customerRecords,
+                      transactions,
+                    );
+
+                    if (!success) {
+                      await showAlert("Dışa aktarılacak cari bulunamadı.", {
+                        title: "Veri Bulunamadı",
+                      });
+                    }
+                  }}
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ width: 16, height: 16 }}
+                  >
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="7 10 12 15 17 10" />
                     <line x1="12" y1="15" x2="12" y2="3" />
@@ -497,8 +636,21 @@ function MenuPage({
               {/* Kart 3: Tam Sistem Yedeği (JSON) */}
               <div className="data-action-card">
                 <div className="data-card-header">
-                  <div className="data-icon-wrap" style={{ background: "var(--primary-light)", color: "var(--primary)" }}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <div
+                    className="data-icon-wrap"
+                    style={{
+                      background: "var(--primary-light)",
+                      color: "var(--primary)",
+                    }}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25" />
                       <line x1="8" y1="16" x2="12" y2="20" />
                       <line x1="16" y1="16" x2="12" y2="20" />
@@ -507,15 +659,28 @@ function MenuPage({
                   </div>
                   <div className="data-card-info">
                     <strong>Tam Sistem Yedeği (.json)</strong>
-                    <span>Tüm veritabanınızı tek bir dosya olarak arşivleyin ve saklayın.</span>
+                    <span>
+                      Tüm veritabanınızı tek bir dosya olarak arşivleyin ve
+                      saklayın.
+                    </span>
                   </div>
                 </div>
                 <button
                   type="button"
                   className="data-export-btn full-backup"
-                  onClick={() => exportFullBackupJSON(transactions, customerRecords, profile)}
+                  onClick={() =>
+                    exportFullBackupJSON(transactions, customerRecords, profile)
+                  }
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ width: 16, height: 16 }}
+                  >
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="7 10 12 15 17 10" />
                     <line x1="12" y1="15" x2="12" y2="3" />
@@ -525,12 +690,23 @@ function MenuPage({
               </div>
 
               <div className="data-info-box">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <circle cx="12" cy="12" r="10" />
                   <line x1="12" y1="16" x2="12" y2="12" />
                   <line x1="12" y1="8" x2="12.01" y2="8" />
                 </svg>
-                <span>İndirilen CSV dosyaları UTF-8 BOM formatındadır; Microsoft Excel'de açıldığında Türkçe karakterler (ç, ğ, ı, ö, ş, ü) bozulmadan görüntülenir.</span>
+                <span>
+                  İndirilen CSV dosyaları UTF-8 BOM formatındadır; Microsoft
+                  Excel'de açıldığında Türkçe karakterler (ç, ğ, ı, ö, ş, ü)
+                  bozulmadan görüntülenir.
+                </span>
               </div>
             </div>
           )}
@@ -538,19 +714,34 @@ function MenuPage({
           {/* ---- İÇERİ AKTARMA TABI ---- */}
           {dataTab === "import" && (
             <div className="data-import-cards-stack">
-              
               {/* Kart 1: JSON Dosyasından Geri Yükle */}
               <div className="data-action-card">
                 <div className="data-card-header">
-                  <div className="data-icon-wrap" style={{ background: "var(--primary-light)", color: "var(--primary)" }}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <div
+                    className="data-icon-wrap"
+                    style={{
+                      background: "var(--primary-light)",
+                      color: "var(--primary)",
+                    }}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <polyline points="1 4 1 10 7 10" />
                       <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
                     </svg>
                   </div>
                   <div className="data-card-info">
                     <strong>JSON Yedek Dosyası Geri Yükle</strong>
-                    <span>Daha önce indirdiğiniz .json formatındaki yedeği içeri aktarın.</span>
+                    <span>
+                      Daha önce indirdiğiniz .json formatındaki yedeği içeri
+                      aktarın.
+                    </span>
                   </div>
                 </div>
 
@@ -567,7 +758,15 @@ function MenuPage({
                   className="data-file-select-btn"
                   onClick={() => jsonInputRef.current?.click()}
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18 }}>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ width: 18, height: 18 }}
+                  >
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="17 8 12 3 7 8" />
                     <line x1="12" y1="3" x2="12" y2="15" />
@@ -591,7 +790,8 @@ function MenuPage({
                     </div>
                     {backupPreview.exportedAt && (
                       <span className="preview-date-text">
-                        Yedekleme Tarihi: {formatDateTime(backupPreview.exportedAt)}
+                        Yedekleme Tarihi:{" "}
+                        {formatDateTime(backupPreview.exportedAt)}
                       </span>
                     )}
 
@@ -602,7 +802,9 @@ function MenuPage({
                       onClick={handleExecuteImport}
                       style={{ marginTop: 10 }}
                     >
-                      {importLoading ? "Veriler Aktarılıyor..." : "Verileri Sisteme Geri Yükle"}
+                      {importLoading
+                        ? "Veriler Aktarılıyor..."
+                        : "Verileri Sisteme Geri Yükle"}
                     </button>
                   </div>
                 )}
@@ -611,15 +813,28 @@ function MenuPage({
               {/* Kart 2: CSV Cari Listesi Yükle */}
               <div className="data-action-card">
                 <div className="data-card-header">
-                  <div className="data-icon-wrap" style={{ background: "#eff6ff", color: "#0284c7" }}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <div
+                    className="data-icon-wrap"
+                    style={{ background: "#eff6ff", color: "#0284c7" }}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
                       <circle cx="9" cy="7" r="4" />
                     </svg>
                   </div>
                   <div className="data-card-info">
                     <strong>CSV'den Toplu Cari Ekle</strong>
-                    <span>Excel'den kaydettiğiniz müşteri listenizi doğrudan yükleyin.</span>
+                    <span>
+                      Excel'den kaydettiğiniz müşteri listenizi doğrudan
+                      yükleyin.
+                    </span>
                   </div>
                 </div>
 
@@ -637,7 +852,15 @@ function MenuPage({
                   disabled={importLoading}
                   onClick={() => csvInputRef.current?.click()}
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18 }}>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ width: 18, height: 18 }}
+                  >
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="17 8 12 3 7 8" />
                     <line x1="12" y1="3" x2="12" y2="15" />
@@ -646,10 +869,13 @@ function MenuPage({
                 </button>
               </div>
 
-              {importError && <div className="form-error-banner">{importError}</div>}
+              {importError && (
+                <div className="form-error-banner">{importError}</div>
+              )}
               {importResult && (
                 <div className="form-success-banner">
-                  ✓ Veriler başarıyla aktarıldı! ({importResult.cCount} Cari, {importResult.tCount} İşlem eklendi).
+                  ✓ Veriler başarıyla aktarıldı! ({importResult.cCount} Cari,{" "}
+                  {importResult.tCount} İşlem eklendi).
                 </div>
               )}
             </div>
@@ -666,8 +892,19 @@ function MenuPage({
     return (
       <div className="page sub-page menu-sub-page">
         <div className="custom-sub-header">
-          <button type="button" className="sub-header-back-btn" onClick={() => setShowAbout(false)}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <button
+            type="button"
+            className="sub-header-back-btn"
+            onClick={() => setShowAbout(false)}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <line x1="19" y1="12" x2="5" y2="12" />
               <polyline points="12 19 5 12 12 5" />
             </svg>
@@ -675,23 +912,82 @@ function MenuPage({
           <h1 className="sub-header-title">Hakkında</h1>
         </div>
 
-        <div className="screen-form-container" style={{ textAlign: "center", paddingTop: 30 }}>
+        <div
+          className="screen-form-container"
+          style={{ textAlign: "center", paddingTop: 30 }}
+        >
           <div className="about-logo-circle">
-            <svg viewBox="0 0 38 38" fill="none" style={{ width: 50, height: 50 }}>
+            <svg
+              viewBox="0 0 38 38"
+              fill="none"
+              style={{ width: 50, height: 50 }}
+            >
               <rect x="6" y="4" width="26" height="30" rx="4" fill="#007384" />
-              <line x1="12" y1="4" x2="12" y2="34" stroke="#ffffff" strokeWidth="1.5" strokeOpacity="0.35" />
-              <line x1="16" y1="12" x2="27" y2="12" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
-              <line x1="16" y1="18" x2="25" y2="18" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
-              <line x1="16" y1="24" x2="22" y2="24" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
+              <line
+                x1="12"
+                y1="4"
+                x2="12"
+                y2="34"
+                stroke="#ffffff"
+                strokeWidth="1.5"
+                strokeOpacity="0.35"
+              />
+              <line
+                x1="16"
+                y1="12"
+                x2="27"
+                y2="12"
+                stroke="#ffffff"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <line
+                x1="16"
+                y1="18"
+                x2="25"
+                y2="18"
+                stroke="#ffffff"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <line
+                x1="16"
+                y1="24"
+                x2="22"
+                y2="24"
+                stroke="#ffffff"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
               <rect x="18" y="2" width="3" height="4" rx="1" fill="#f59e0b" />
               <rect x="23" y="2" width="3" height="4" rx="1" fill="#10b981" />
             </svg>
           </div>
-          <h2 style={{ fontSize: 20, margin: "14px 0 4px", color: "var(--text-main)" }}>İşletme Defteri</h2>
-          <span style={{ fontSize: 13, color: "var(--text-sub)" }}>Sürüm 1.0.0</span>
+          <h2
+            style={{
+              fontSize: 20,
+              margin: "14px 0 4px",
+              color: "var(--text-main)",
+            }}
+          >
+            İşletme Defteri
+          </h2>
+          <span style={{ fontSize: 13, color: "var(--text-sub)" }}>
+            Sürüm 1.0.1
+          </span>
 
-          <p style={{ marginTop: 24, fontSize: 13, color: "var(--text-sub)", lineHeight: 1.6, textAlign: "left" }}>
-            İşletme Defteri, küçük işletmeler ve esnaflar için geliştirilmiş modern, kolay ve profesyonel bir cari ve gelir-gider takip uygulamasıdır.
+          <p
+            style={{
+              marginTop: 24,
+              fontSize: 13,
+              color: "var(--text-sub)",
+              lineHeight: 1.6,
+              textAlign: "left",
+            }}
+          >
+            İşletme Defteri, küçük işletmeler ve esnaflar için geliştirilmiş
+            modern, kolay ve profesyonel bir cari ve gelir-gider takip
+            uygulamasıdır.
           </p>
         </div>
       </div>
@@ -713,9 +1009,20 @@ function MenuPage({
       <div className="menu-items-card-wrap">
         <div className="menu-items-single-card">
           {/* 1. Profil Bilgileri */}
-          <button type="button" className="menu-single-row-item" onClick={() => onNavigate("profile")}>
+          <button
+            type="button"
+            className="menu-single-row-item"
+            onClick={() => onNavigate("profile")}
+          >
             <div className="menu-item-icon-wrap">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                 <circle cx="12" cy="7" r="4" />
               </svg>
@@ -725,9 +1032,20 @@ function MenuPage({
           </button>
 
           {/* 2. Şifre Değiştir */}
-          <button type="button" className="menu-single-row-item" onClick={() => setShowChangePassword(true)}>
+          <button
+            type="button"
+            className="menu-single-row-item"
+            onClick={() => setShowChangePassword(true)}
+          >
             <div className="menu-item-icon-wrap">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
@@ -737,9 +1055,20 @@ function MenuPage({
           </button>
 
           {/* 3. Uygulama Ayarları */}
-          <button type="button" className="menu-single-row-item" onClick={() => setShowAppSettings(true)}>
+          <button
+            type="button"
+            className="menu-single-row-item"
+            onClick={() => setShowAppSettings(true)}
+          >
             <div className="menu-item-icon-wrap">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <circle cx="12" cy="12" r="3" />
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>
@@ -758,7 +1087,14 @@ function MenuPage({
             }}
           >
             <div className="menu-item-icon-wrap">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <polyline points="1 4 1 10 7 10" />
                 <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
               </svg>
@@ -777,7 +1113,14 @@ function MenuPage({
             }}
           >
             <div className="menu-item-icon-wrap">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                 <polyline points="17 8 12 3 7 8" />
                 <line x1="12" y1="3" x2="12" y2="15" />
@@ -791,11 +1134,25 @@ function MenuPage({
           <div className="menu-single-row-item">
             <div className="menu-item-icon-wrap">
               {isDark ? (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                 </svg>
               ) : (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <circle cx="12" cy="12" r="5" />
                   <line x1="12" y1="1" x2="12" y2="3" />
                   <line x1="12" y1="21" x2="12" y2="23" />
@@ -810,7 +1167,9 @@ function MenuPage({
             </div>
             <span className="menu-item-text">Karanlık Tema</span>
             <div className="menu-theme-right-wrap">
-              <span className="theme-name-label">{isDark ? "Koyu" : "Açık"}</span>
+              <span className="theme-name-label">
+                {isDark ? "Koyu" : "Açık"}
+              </span>
               <button
                 type="button"
                 className={`ios-toggle-switch ${isDark ? "checked" : ""}`}
@@ -823,9 +1182,20 @@ function MenuPage({
           </div>
 
           {/* 7. Hakkında */}
-          <button type="button" className="menu-single-row-item" onClick={() => setShowAbout(true)}>
+          <button
+            type="button"
+            className="menu-single-row-item"
+            onClick={() => setShowAbout(true)}
+          >
             <div className="menu-item-icon-wrap">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <circle cx="12" cy="12" r="10" />
                 <line x1="12" y1="16" x2="12" y2="12" />
                 <line x1="12" y1="8" x2="12.01" y2="8" />
@@ -838,9 +1208,20 @@ function MenuPage({
 
         {/* 8. Çıkış Yap (Açık Kırmızı Kart) */}
         <div className="menu-logout-card-wrap">
-          <button type="button" className="menu-logout-card-btn" onClick={onLogout}>
+          <button
+            type="button"
+            className="menu-logout-card-btn"
+            onClick={onLogout}
+          >
             <div className="menu-logout-icon-wrap">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                 <polyline points="16 17 21 12 16 7" />
                 <line x1="21" y1="12" x2="9" y2="12" />

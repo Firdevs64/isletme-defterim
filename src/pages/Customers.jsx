@@ -10,10 +10,14 @@ import { useEffect, useMemo, useState } from "react";
 import {
   addDoc,
   collection,
+  deleteDoc,
+  doc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import {
@@ -25,6 +29,7 @@ import {
   getCustomerTypeLabel,
   getInitials,
 } from "../utils/transactionHelpers";
+import { useAppDialog } from "../components/AppDialog";
 
 /* Referans tasarımdaki renk paleti */
 const AVATAR_COLORS = [
@@ -45,6 +50,8 @@ function CustomersPage({
   deleteTransaction,
   onOpenNewTransaction,
 }) {
+  const { showAlert, showConfirm } = useAppDialog();
+
   const [view, setView] = useState("list"); // list | new | detail | addNote
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all"); // all | receivable | payable | other
@@ -56,7 +63,11 @@ function CustomersPage({
   const [notesLoading, setNotesLoading] = useState(false);
 
   // Not Ekleme Formu (Ekran 10)
-  const [noteForm, setNoteForm] = useState({ title: "", note: "", reminder: "" });
+  const [noteForm, setNoteForm] = useState({
+    title: "",
+    note: "",
+    reminder: "",
+  });
   const [savingNote, setSavingNote] = useState(false);
 
   // Yeni Cari Formu (Ekran 3)
@@ -68,19 +79,27 @@ function CustomersPage({
     type: "customer", // customer | supplier | other
   });
   const [savingCustomer, setSavingCustomer] = useState(false);
+  const [editingCustomerId, setEditingCustomerId] = useState(null);
+  const [editingCustomerOldName, setEditingCustomerOldName] = useState("");
 
   /* ---- Carileri Hazırla & Birleştir ---- */
   const customers = useMemo(() => {
     const savedNames = customerRecords.map((c) => c.name).filter(Boolean);
-    const oldNames = transactions.filter((t) => t.customer).map((t) => t.customer);
+    const oldNames = transactions
+      .filter((t) => t.customer)
+      .map((t) => t.customer);
     const allNames = [...new Set([...savedNames, ...oldNames])];
 
     return allNames.map((name) => {
       const saved = customerRecords.find(
-        (c) => c.name?.toLocaleLowerCase("tr-TR") === name.toLocaleLowerCase("tr-TR")
+        (c) =>
+          c.name?.toLocaleLowerCase("tr-TR") ===
+          name.toLocaleLowerCase("tr-TR"),
       );
       const txns = transactions.filter(
-        (t) => t.customer?.toLocaleLowerCase("tr-TR") === name.toLocaleLowerCase("tr-TR")
+        (t) =>
+          t.customer?.toLocaleLowerCase("tr-TR") ===
+          name.toLocaleLowerCase("tr-TR"),
       );
 
       const totalSales = txns
@@ -101,7 +120,11 @@ function CustomersPage({
 
       // Bakiye = (Satışlar - Tahsilatlar) - (Alışlar - Ödemeler)
       // Pozitif ise işletme alacaklıdır. Negatif ise işletme borçludur.
-      const balance = (totalSales - totalCollections) - (totalPurchases - totalPayouts);
+      const receivable = Math.max(totalSales - totalCollections, 0);
+      const payable = Math.max(totalPurchases - totalPayouts, 0);
+
+      const balance =
+        totalSales - totalCollections - (totalPurchases - totalPayouts);
 
       return {
         id: saved?.id || name,
@@ -110,11 +133,15 @@ function CustomersPage({
         email: saved?.email || "",
         note: saved?.note || "",
         type: saved?.type || "customer",
-        color: saved?.color || AVATAR_COLORS[Math.abs(name.charCodeAt(0)) % AVATAR_COLORS.length],
+        color:
+          saved?.color ||
+          AVATAR_COLORS[Math.abs(name.charCodeAt(0)) % AVATAR_COLORS.length],
         totalSales,
         totalCollections,
         totalPurchases,
         totalPayouts,
+        receivable,
+        payable,
         balance,
         transactions: txns.sort((a, b) => (b.date > a.date ? 1 : -1)),
       };
@@ -126,12 +153,15 @@ function CustomersPage({
     let list = customers;
     if (search.trim()) {
       list = list.filter((c) =>
-        c.name.toLocaleLowerCase("tr-TR").includes(search.trim().toLocaleLowerCase("tr-TR"))
+        c.name
+          .toLocaleLowerCase("tr-TR")
+          .includes(search.trim().toLocaleLowerCase("tr-TR")),
       );
     }
     if (filter === "receivable") list = list.filter((c) => c.balance > 0);
     if (filter === "payable") list = list.filter((c) => c.balance < 0);
-    if (filter === "other") list = list.filter((c) => c.type === "other" || c.balance === 0);
+    if (filter === "other")
+      list = list.filter((c) => c.type === "other" || c.balance === 0);
     return list;
   }, [customers, search, filter]);
 
@@ -141,7 +171,14 @@ function CustomersPage({
   useEffect(() => {
     if (!user || !selectedCustomer?.id || view !== "detail") return;
     setNotesLoading(true);
-    const notesRef = collection(db, "users", user.uid, "customers", selectedCustomer.id, "notes");
+    const notesRef = collection(
+      db,
+      "users",
+      user.uid,
+      "customers",
+      selectedCustomer.id,
+      "notes",
+    );
     const q = query(notesRef, orderBy("createdAt", "desc"));
     const unsub = onSnapshot(
       q,
@@ -152,7 +189,7 @@ function CustomersPage({
       () => {
         setCustomerNotes([]);
         setNotesLoading(false);
-      }
+      },
     );
     return unsub;
   }, [user, selectedCustomer?.id, view]);
@@ -160,30 +197,83 @@ function CustomersPage({
   /* ---- Yeni Cari Kaydet (Ekran 3) ---- */
   const handleSaveCustomer = async (e) => {
     e.preventDefault();
+
     if (!user) return;
+
     const name = customerForm.name.trim();
+
     if (!name) {
-      alert("Lütfen Cari Adı alanını doldurun.");
+      await showAlert("Lütfen Cari Adı alanını doldurun.", {
+        title: "Eksik Bilgi",
+      });
       return;
     }
+
     const alreadyExists = customers.some(
-      (c) => c.name.toLocaleLowerCase("tr-TR") === name.toLocaleLowerCase("tr-TR")
+      (c) =>
+        c.name.toLocaleLowerCase("tr-TR") === name.toLocaleLowerCase("tr-TR") &&
+        c.id !== editingCustomerId,
     );
+
     if (alreadyExists) {
-      alert("Bu isimde bir cari zaten kayıtlı.");
+      await showAlert("Bu isimde bir cari zaten kayıtlı.", {
+        title: "Cari Zaten Kayıtlı",
+      });
       return;
     }
 
     setSavingCustomer(true);
+
     try {
-      await addDoc(collection(db, "users", user.uid, "customers"), {
+      const customerData = {
         name,
         phone: customerForm.phone.trim(),
         email: customerForm.email.trim(),
         note: customerForm.note.trim(),
         type: customerForm.type,
-        createdAt: serverTimestamp(),
-      });
+      };
+
+      if (editingCustomerId) {
+        await updateDoc(
+          doc(db, "users", user.uid, "customers", editingCustomerId),
+          customerData,
+        );
+
+        if (
+          editingCustomerOldName &&
+          editingCustomerOldName.toLocaleLowerCase("tr-TR") !==
+            name.toLocaleLowerCase("tr-TR")
+        ) {
+          const transactionsRef = collection(
+            db,
+            "users",
+            user.uid,
+            "transactions",
+          );
+
+          const transactionsSnapshot = await getDocs(transactionsRef);
+
+          const relatedTransactions = transactionsSnapshot.docs.filter(
+            (transactionDoc) =>
+              transactionDoc.data().customer?.toLocaleLowerCase("tr-TR") ===
+              editingCustomerOldName.toLocaleLowerCase("tr-TR"),
+          );
+
+          await Promise.all(
+            relatedTransactions.map((transactionDoc) =>
+              updateDoc(transactionDoc.ref, {
+                customer: name,
+              }),
+            ),
+          );
+        }
+      } else {
+        await addDoc(collection(db, "users", user.uid, "customers"), {
+          ...customerData,
+          createdAt: serverTimestamp(),
+        });
+      }
+
       setCustomerForm({
         name: "",
         phone: "",
@@ -191,43 +281,124 @@ function CustomersPage({
         note: "",
         type: "customer",
       });
+
+      setEditingCustomerId(null);
+      setEditingCustomerOldName("");
       setView("list");
-    } catch {
-      alert("Cari kaydedilirken bir hata oluştu.");
+    } catch (error) {
+      console.error("Cari kaydetme hatası:", error);
+
+      await showAlert(
+        editingCustomerId
+          ? "Cari güncellenirken bir hata oluştu."
+          : "Cari kaydedilirken bir hata oluştu.",
+        {
+          title: editingCustomerId ? "Güncelleme Başarısız" : "Kayıt Başarısız",
+        },
+      );
     } finally {
       setSavingCustomer(false);
     }
   };
+  const handleDeleteCustomer = async () => {
+    if (!user || !selectedCustomer) return;
 
+    if (selectedCustomer.transactions.length > 0) {
+      await showAlert(
+        `Bu cariye ait ${selectedCustomer.transactions.length} işlem bulunuyor. Cariyi silebilmek için önce bu cariye ait işlemleri silmelisiniz.`,
+        {
+          title: "Cari Silinemiyor",
+        },
+      );
+      return;
+    }
+
+    const savedCustomer = customerRecords.find(
+      (c) => c.id === selectedCustomer.id,
+    );
+
+    if (!savedCustomer) {
+      await showAlert("Bu cariye ait silinebilecek kayıt bulunamadı.", {
+        title: "Kayıt Bulunamadı",
+      });
+      return;
+    }
+
+    const confirmed = await showConfirm(
+      `"${selectedCustomer.name}" carisini silmek istediğinize emin misiniz?`,
+      {
+        title: "Cariyi Sil",
+        confirmText: "Sil",
+        cancelText: "Vazgeç",
+        danger: true,
+      },
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await deleteDoc(
+        doc(db, "users", user.uid, "customers", selectedCustomer.id),
+      );
+
+      setSelectedName(null);
+      setView("list");
+    } catch (error) {
+      console.error("Cari silme hatası:", error);
+
+      await showAlert("Cari silinirken bir hata oluştu.", {
+        title: "Silme Başarısız",
+      });
+    }
+  };
   /* ---- Cari Not Kaydet (Ekran 10) ---- */
   const handleSaveNote = async (e) => {
     e.preventDefault();
+
     if (!user || !selectedCustomer) return;
+
     if (!noteForm.note.trim()) {
-      alert("Lütfen not metnini girin.");
+      await showAlert("Lütfen not metnini girin.", {
+        title: "Eksik Bilgi",
+      });
       return;
     }
 
     setSavingNote(true);
+
     try {
       await addDoc(
-        collection(db, "users", user.uid, "customers", selectedCustomer.id, "notes"),
+        collection(
+          db,
+          "users",
+          user.uid,
+          "customers",
+          selectedCustomer.id,
+          "notes",
+        ),
         {
           title: noteForm.title.trim(),
           note: noteForm.note.trim(),
           reminder: noteForm.reminder || null,
           createdAt: serverTimestamp(),
-        }
+        },
       );
-      setNoteForm({ title: "", note: "", reminder: "" });
+
+      setNoteForm({
+        title: "",
+        note: "",
+        reminder: "",
+      });
+
       setView("detail");
     } catch {
-      alert("Not kaydedilemedi.");
+      await showAlert("Not kaydedilemedi.", {
+        title: "Kayıt Başarısız",
+      });
     } finally {
       setSavingNote(false);
     }
   };
-
   /* ============================================================
      GÖRÜNÜM 10: CARİ NOT EKLE (Referans Ekran 10)
   ============================================================ */
@@ -236,8 +407,19 @@ function CustomersPage({
       <div className="page sub-page">
         {/* Header: ← Not Ekle */}
         <div className="custom-sub-header">
-          <button type="button" className="sub-header-back-btn" onClick={() => setView("detail")}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <button
+            type="button"
+            className="sub-header-back-btn"
+            onClick={() => setView("detail")}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <line x1="19" y1="12" x2="5" y2="12" />
               <polyline points="12 19 5 12 12 5" />
             </svg>
@@ -250,19 +432,24 @@ function CustomersPage({
             {/* Cari Adı (Statik) */}
             <div className="field-group">
               <label className="field-label">Cari</label>
-              <div className="field-static-readonly">{selectedCustomer.name}</div>
+              <div className="field-static-readonly">
+                {selectedCustomer.name}
+              </div>
             </div>
 
             {/* Not Başlığı */}
             <div className="field-group">
               <label className="field-label">
-                Not Başlığı <span className="field-optional">(isteğe bağlı)</span>
+                Not Başlığı{" "}
+                <span className="field-optional">(isteğe bağlı)</span>
               </label>
               <input
                 type="text"
                 className="field-text-input"
                 value={noteForm.title}
-                onChange={(e) => setNoteForm({ ...noteForm, title: e.target.value })}
+                onChange={(e) =>
+                  setNoteForm({ ...noteForm, title: e.target.value })
+                }
               />
             </div>
 
@@ -274,28 +461,39 @@ function CustomersPage({
                 rows={5}
                 value={noteForm.note}
                 maxLength={500}
-                onChange={(e) => setNoteForm({ ...noteForm, note: e.target.value })}
+                onChange={(e) =>
+                  setNoteForm({ ...noteForm, note: e.target.value })
+                }
               />
-              <span className="field-char-counter">{noteForm.note.length}/500</span>
+              <span className="field-char-counter">
+                {noteForm.note.length}/500
+              </span>
             </div>
 
             {/* Hatırlatma (isteğe bağlı) */}
             <div className="field-group">
               <label className="field-label">
-                Hatırlatma <span className="field-optional">(isteğe bağlı)</span>
+                Hatırlatma{" "}
+                <span className="field-optional">(isteğe bağlı)</span>
               </label>
               <div className="field-with-icon-right">
                 <input
                   type="date"
                   className="field-text-input"
                   value={noteForm.reminder}
-                  onChange={(e) => setNoteForm({ ...noteForm, reminder: e.target.value })}
+                  onChange={(e) =>
+                    setNoteForm({ ...noteForm, reminder: e.target.value })
+                  }
                 />
                 <span className="field-right-icon">📅</span>
               </div>
             </div>
 
-            <button type="submit" className="primary-teal-btn" disabled={savingNote}>
+            <button
+              type="submit"
+              className="primary-teal-btn"
+              disabled={savingNote}
+            >
               {savingNote ? "Kaydediliyor..." : "Kaydet"}
             </button>
           </form>
@@ -315,8 +513,19 @@ function CustomersPage({
       <div className="page sub-page">
         {/* Header: ← [Cari Adı / Boş]       Düzenle */}
         <div className="custom-sub-header">
-          <button type="button" className="sub-header-back-btn" onClick={() => setView("list")}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <button
+            type="button"
+            className="sub-header-back-btn"
+            onClick={() => setView("list")}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <line x1="19" y1="12" x2="5" y2="12" />
               <polyline points="12 19 5 12 12 5" />
             </svg>
@@ -333,6 +542,8 @@ function CustomersPage({
                 note: c.note,
                 type: c.type,
               });
+              setEditingCustomerId(c.id);
+              setEditingCustomerOldName(c.name);
               setView("new");
             }}
           >
@@ -345,19 +556,22 @@ function CustomersPage({
           <div className="cari-detail-top-grid">
             {/* Profil Bölümü */}
             <div className="cari-detail-profile-card">
-              <div className="cari-big-avatar" style={{ backgroundColor: c.color }}>
+              <div
+                className="cari-big-avatar"
+                style={{ backgroundColor: c.color }}
+              >
                 {getInitials(c.name)}
               </div>
               <h2 className="cari-profile-name">{c.name}</h2>
-              <div className="cari-profile-badge">{getCustomerTypeLabel(c.type)}</div>
+              <div className="cari-profile-badge">
+                {getCustomerTypeLabel(c.type)}
+              </div>
               {c.phone && (
                 <div className="cari-profile-phone">
                   <span>📞 {c.phone}</span>
                 </div>
               )}
-              {c.note && (
-                <p className="cari-profile-note-snippet">{c.note}</p>
-              )}
+              {c.note && <p className="cari-profile-note-snippet">{c.note}</p>}
             </div>
 
             <div className="cari-detail-balances-group">
@@ -365,19 +579,48 @@ function CustomersPage({
               <div className="cari-two-summary-boxes">
                 <div className="cari-summary-box">
                   <span className="csb-label">Toplam İş</span>
-                  <strong className="csb-value">{formatMoney(c.totalSales)} ₺</strong>
+                  <strong className="csb-value">
+                    {formatMoney(c.totalSales)} ₺
+                  </strong>
                 </div>
                 <div className="cari-summary-box">
                   <span className="csb-label">Tahsilat</span>
-                  <strong className="csb-value">{formatMoney(c.totalCollections)} ₺</strong>
+                  <strong className="csb-value">
+                    {formatMoney(c.totalCollections)} ₺
+                  </strong>
                 </div>
               </div>
 
-              {/* Büyük Kalan Alacak / Borç Kartı */}
+              <div className="cari-two-summary-boxes">
+                <div className="cari-summary-box">
+                  <span className="csb-label">Kalan Alacak</span>
+                  <strong className="csb-value amount-green">
+                    {formatMoney(c.receivable)} ₺
+                  </strong>
+                </div>
+
+                <div className="cari-summary-box">
+                  <span className="csb-label">Kalan Borç</span>
+                  <strong className="csb-value amount-red">
+                    {formatMoney(c.payable)} ₺
+                  </strong>
+                </div>
+              </div>
+
               <div className="cari-big-balance-card">
-                <span className="cbb-label">{isAlacakli ? "Kalan Alacak" : "Kalan Borç"}</span>
-                <strong className={`cbb-amount ${isAlacakli ? "amount-green" : "amount-red"}`}>
-                  {formatMoney(Math.abs(c.balance))} ₺
+                <span className="cbb-label">Net Bakiye</span>
+
+                <strong
+                  className={`cbb-amount ${
+                    c.balance > 0
+                      ? "amount-green"
+                      : c.balance < 0
+                        ? "amount-red"
+                        : ""
+                  }`}
+                >
+                  {formatMoney(Math.abs(c.balance))} ₺{" "}
+                  {c.balance > 0 ? "Alacak" : c.balance < 0 ? "Borç" : ""}
                 </strong>
               </div>
             </div>
@@ -424,27 +667,59 @@ function CustomersPage({
 
                     return (
                       <div className="cari-txn-item-row" key={tx.id}>
-                        <div className={`cari-txn-icon-wrap cari-icon-${normType}`}>
+                        <div
+                          className={`cari-txn-icon-wrap cari-icon-${normType}`}
+                        >
                           {normType === "collection" && (
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" />
+                            <svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.4"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <line x1="12" y1="5" x2="12" y2="19" />
+                              <polyline points="19 12 12 19 5 12" />
                             </svg>
                           )}
                           {normType === "sale" && (
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                            <svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <circle cx="9" cy="21" r="1" />
+                              <circle cx="20" cy="21" r="1" />
+                              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
                             </svg>
                           )}
-                          {(normType === "purchase" || normType === "payout") && (
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" />
+                          {(normType === "purchase" ||
+                            normType === "payout") && (
+                            <svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.4"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <line x1="12" y1="19" x2="12" y2="5" />
+                              <polyline points="5 12 12 5 19 12" />
                             </svg>
                           )}
                         </div>
 
                         <div className="cari-txn-desc-col">
-                          <strong className="cari-txn-type-title">{label}</strong>
-                          <span className="cari-txn-date-time">{formatDate(tx.date)}</span>
+                          <strong className="cari-txn-type-title">
+                            {label}
+                          </strong>
+                          <span className="cari-txn-date-time">
+                            {formatDate(tx.date)}
+                          </span>
                         </div>
 
                         <strong
@@ -452,11 +727,13 @@ function CustomersPage({
                             normType === "sale"
                               ? "amount-blue"
                               : normType === "collection"
-                              ? "amount-green"
-                              : "amount-red"
+                                ? "amount-green"
+                                : "amount-red"
                           }`}
                         >
-                          {normType === "purchase" || normType === "payout" ? "-" : ""}
+                          {normType === "purchase" || normType === "payout"
+                            ? "-"
+                            : ""}
                           {formatMoney(tx.amount)} ₺
                         </strong>
 
@@ -479,14 +756,26 @@ function CustomersPage({
                 <button
                   type="button"
                   className="cari-action-btn-primary"
-                  onClick={() => onOpenNewTransaction({ customer: c.name, type: "sale", returnTo: "customers" })}
+                  onClick={() =>
+                    onOpenNewTransaction({
+                      customer: c.name,
+                      type: "sale",
+                      returnTo: "customers",
+                    })
+                  }
                 >
                   + Yeni İş
                 </button>
                 <button
                   type="button"
                   className="cari-action-btn-secondary"
-                  onClick={() => onOpenNewTransaction({ customer: c.name, type: "collection", returnTo: "customers" })}
+                  onClick={() =>
+                    onOpenNewTransaction({
+                      customer: c.name,
+                      type: "collection",
+                      returnTo: "customers",
+                    })
+                  }
                 >
                   Tahsilat / Ödeme
                 </button>
@@ -498,7 +787,9 @@ function CustomersPage({
           {detailTab === "notes" && (
             <div className="cari-tab-pane">
               {notesLoading ? (
-                <div className="empty-tab-notice"><span>Notlar yükleniyor...</span></div>
+                <div className="empty-tab-notice">
+                  <span>Notlar yükleniyor...</span>
+                </div>
               ) : customerNotes.length === 0 ? (
                 <div className="empty-tab-notice">
                   <span>Bu cariye ait henüz not bulunmuyor.</span>
@@ -507,7 +798,9 @@ function CustomersPage({
                 <div className="notes-list-stack">
                   {customerNotes.map((n) => (
                     <div className="note-card-item" key={n.id}>
-                      {n.title && <strong className="note-card-title">{n.title}</strong>}
+                      {n.title && (
+                        <strong className="note-card-title">{n.title}</strong>
+                      )}
                       <p className="note-card-content">{n.note}</p>
                       {n.reminder && (
                         <div className="note-card-reminder">
@@ -554,6 +847,14 @@ function CustomersPage({
                   <p>{c.note || "Kayıtlı not bulunmuyor."}</p>
                 </div>
               </div>
+              <button
+                type="button"
+                className="profile-delete-account-button"
+                onClick={handleDeleteCustomer}
+                style={{ marginTop: 20 }}
+              >
+                Cariyi Sil
+              </button>
             </div>
           )}
         </div>
@@ -569,8 +870,19 @@ function CustomersPage({
       <div className="page sub-page">
         {/* Header: ← Yeni Cari */}
         <div className="custom-sub-header">
-          <button type="button" className="sub-header-back-btn" onClick={() => setView("list")}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <button
+            type="button"
+            className="sub-header-back-btn"
+            onClick={() => setView("list")}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <line x1="19" y1="12" x2="5" y2="12" />
               <polyline points="12 19 5 12 12 5" />
             </svg>
@@ -584,21 +896,27 @@ function CustomersPage({
             <button
               type="button"
               className={`segment-tab-btn ${customerForm.type === "customer" ? "active" : ""}`}
-              onClick={() => setCustomerForm({ ...customerForm, type: "customer" })}
+              onClick={() =>
+                setCustomerForm({ ...customerForm, type: "customer" })
+              }
             >
               Müşteri
             </button>
             <button
               type="button"
               className={`segment-tab-btn ${customerForm.type === "supplier" ? "active" : ""}`}
-              onClick={() => setCustomerForm({ ...customerForm, type: "supplier" })}
+              onClick={() =>
+                setCustomerForm({ ...customerForm, type: "supplier" })
+              }
             >
               Tedarikçi
             </button>
             <button
               type="button"
               className={`segment-tab-btn ${customerForm.type === "other" ? "active" : ""}`}
-              onClick={() => setCustomerForm({ ...customerForm, type: "other" })}
+              onClick={() =>
+                setCustomerForm({ ...customerForm, type: "other" })
+              }
             >
               Diğer
             </button>
@@ -612,7 +930,9 @@ function CustomersPage({
                 type="text"
                 className="field-text-input"
                 value={customerForm.name}
-                onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })}
+                onChange={(e) =>
+                  setCustomerForm({ ...customerForm, name: e.target.value })
+                }
                 required
               />
             </div>
@@ -624,7 +944,9 @@ function CustomersPage({
                 type="tel"
                 className="field-text-input"
                 value={customerForm.phone}
-                onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })}
+                onChange={(e) =>
+                  setCustomerForm({ ...customerForm, phone: e.target.value })
+                }
               />
             </div>
 
@@ -637,7 +959,9 @@ function CustomersPage({
                 type="email"
                 className="field-text-input"
                 value={customerForm.email}
-                onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })}
+                onChange={(e) =>
+                  setCustomerForm({ ...customerForm, email: e.target.value })
+                }
               />
             </div>
 
@@ -649,12 +973,20 @@ function CustomersPage({
                 rows={3}
                 value={customerForm.note}
                 maxLength={500}
-                onChange={(e) => setCustomerForm({ ...customerForm, note: e.target.value })}
+                onChange={(e) =>
+                  setCustomerForm({ ...customerForm, note: e.target.value })
+                }
               />
-              <span className="field-char-counter">{customerForm.note.length}/500</span>
+              <span className="field-char-counter">
+                {customerForm.note.length}/500
+              </span>
             </div>
 
-            <button type="submit" className="primary-teal-btn" disabled={savingCustomer}>
+            <button
+              type="submit"
+              className="primary-teal-btn"
+              disabled={savingCustomer}
+            >
               {savingCustomer ? "Kaydediliyor..." : "Kaydet"}
             </button>
           </form>
@@ -676,7 +1008,15 @@ function CustomersPage({
       {/* Arama Barı + Filtre İkonu */}
       <div className="cari-search-row">
         <div className="cari-search-input-wrap">
-          <svg className="cari-search-lens" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            className="cari-search-lens"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
@@ -699,7 +1039,14 @@ function CustomersPage({
             else setFilter("all");
           }}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
           </svg>
         </button>
@@ -742,7 +1089,20 @@ function CustomersPage({
         <button
           type="button"
           className="cari-add-customer-btn"
-          onClick={() => setView("new")}
+          onClick={() => {
+            setEditingCustomerId(null);
+            setEditingCustomerOldName("");
+
+            setCustomerForm({
+              name: "",
+              phone: "",
+              email: "",
+              note: "",
+              type: "customer",
+            });
+
+            setView("new");
+          }}
         >
           <span className="plus-sign">+</span> Yeni Cari Ekle
         </button>
@@ -753,7 +1113,11 @@ function CustomersPage({
         {filteredCustomers.length === 0 ? (
           <div className="empty-cariler-card">
             <div className="empty-icon-circle">👥</div>
-            <strong>{customers.length === 0 ? "Henüz cari kaydı yok" : "Aranan cari bulunamadı"}</strong>
+            <strong>
+              {customers.length === 0
+                ? "Henüz cari kaydı yok"
+                : "Aranan cari bulunamadı"}
+            </strong>
             <span>
               {customers.length === 0
                 ? "Yukarıdaki '+ Yeni Cari Ekle' butonuyla cari oluşturabilirsiniz."
@@ -777,7 +1141,10 @@ function CustomersPage({
                 }}
               >
                 {/* Sol Avatar (Daire, İsim Baş Harfi) */}
-                <div className="cari-item-avatar" style={{ backgroundColor: c.color }}>
+                <div
+                  className="cari-item-avatar"
+                  style={{ backgroundColor: c.color }}
+                >
                   {getInitials(c.name)}
                 </div>
 
@@ -785,7 +1152,8 @@ function CustomersPage({
                 <div className="cari-item-mid-col">
                   <strong className="cari-item-title">{c.name}</strong>
                   <span className="cari-item-sub-info">
-                    {getCustomerTypeLabel(c.type)} · {c.transactions.length} işlem
+                    {getCustomerTypeLabel(c.type)} · {c.transactions.length}{" "}
+                    işlem
                   </span>
                 </div>
 
@@ -793,14 +1161,23 @@ function CustomersPage({
                 <div className="cari-item-right-col">
                   <strong
                     className={`cari-item-amount ${
-                      isAlacakli ? "amount-green" : isBorclu ? "amount-red" : "amount-neutral"
+                      isAlacakli
+                        ? "amount-green"
+                        : isBorclu
+                          ? "amount-red"
+                          : "amount-neutral"
                     }`}
                   >
-                    {isBorclu ? "-₺" : "₺"}{formatMoney(Math.abs(c.balance))}
+                    {isBorclu ? "-₺" : "₺"}
+                    {formatMoney(Math.abs(c.balance))}
                   </strong>
                   <span
                     className={`cari-item-status-tag ${
-                      isAlacakli ? "status-alacakli" : isBorclu ? "status-borclu" : ""
+                      isAlacakli
+                        ? "status-alacakli"
+                        : isBorclu
+                          ? "status-borclu"
+                          : ""
                     }`}
                   >
                     {isAlacakli ? "Alacaklı" : isBorclu ? "Borçlu" : "—"}

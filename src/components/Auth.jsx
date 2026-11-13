@@ -1,13 +1,17 @@
 ﻿import { useState } from "react";
+import { useAppDialog } from "./AppDialog";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updateProfile,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
 function Auth() {
+  const { showAlert } = useAppDialog();
+
   const [mode, setMode] = useState("login");
 
   const [form, setForm] = useState({
@@ -42,11 +46,7 @@ function Auth() {
     try {
       setLoading(true);
 
-      await signInWithEmailAndPassword(
-        auth,
-        form.email.trim(),
-        form.password
-      );
+      await signInWithEmailAndPassword(auth, form.email.trim(), form.password);
     } catch (error) {
       console.error(error);
 
@@ -60,6 +60,45 @@ function Auth() {
         setError("Geçerli bir e-posta adresi girin.");
       } else {
         setError("Giriş yapılırken bir hata oluştu.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+  const handleForgotPassword = async () => {
+    setError("");
+
+    const email = form.email.trim();
+
+    if (!email) {
+      setError("Şifrenizi sıfırlamak için önce e-posta adresinizi girin.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      await sendPasswordResetEmail(auth, email);
+
+      await showAlert(
+        "Şifre sıfırlama bağlantısı e-posta adresinize gönderildi. Gelen kutunuzu kontrol edin.",
+        {
+          title: "E-posta Gönderildi",
+        },
+      );
+    } catch (error) {
+      console.error(error);
+
+      if (error.code === "auth/invalid-email") {
+        setError("Geçerli bir e-posta adresi girin.");
+      } else if (error.code === "auth/too-many-requests") {
+        setError(
+          "Çok fazla deneme yapıldı. Lütfen bir süre sonra tekrar deneyin.",
+        );
+      } else {
+        setError(
+          "Şifre sıfırlama e-postası gönderilemedi. Lütfen tekrar deneyin.",
+        );
       }
     } finally {
       setLoading(false);
@@ -94,12 +133,11 @@ function Auth() {
     try {
       setLoading(true);
 
-      const userCredential =
-        await createUserWithEmailAndPassword(
-          auth,
-          form.email.trim(),
-          form.password
-        );
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        form.email.trim(),
+        form.password,
+      );
 
       const user = userCredential.user;
 
@@ -141,9 +179,7 @@ function Auth() {
           <p>İşletme Defteri</p>
 
           <h1>
-            {mode === "login"
-              ? "Tekrar hoş geldiniz"
-              : "Hesabınızı oluşturun"}
+            {mode === "login" ? "Tekrar hoş geldiniz" : "Hesabınızı oluşturun"}
           </h1>
 
           <span>
@@ -179,11 +215,7 @@ function Auth() {
 
         <form
           className="auth-form"
-          onSubmit={
-            mode === "login"
-              ? handleLogin
-              : handleRegister
-          }
+          onSubmit={mode === "login" ? handleLogin : handleRegister}
         >
           {mode === "register" && (
             <>
@@ -229,12 +261,20 @@ function Auth() {
               value={form.password}
               onChange={handleChange}
               autoComplete={
-                mode === "login"
-                  ? "current-password"
-                  : "new-password"
+                mode === "login" ? "current-password" : "new-password"
               }
             />
           </label>
+          {mode === "login" && (
+            <button
+              type="button"
+              className="forgot-password-btn"
+              onClick={handleForgotPassword}
+              disabled={loading}
+            >
+              Şifremi Unuttum
+            </button>
+          )}
 
           {mode === "register" && (
             <label>
@@ -250,17 +290,9 @@ function Auth() {
             </label>
           )}
 
-          {error && (
-            <div className="auth-error">
-              {error}
-            </div>
-          )}
+          {error && <div className="auth-error">{error}</div>}
 
-          <button
-            type="submit"
-            className="auth-submit"
-            disabled={loading}
-          >
+          <button type="submit" className="auth-submit" disabled={loading}>
             {loading
               ? "Lütfen bekleyin..."
               : mode === "login"

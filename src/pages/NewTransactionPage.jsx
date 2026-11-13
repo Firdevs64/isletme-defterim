@@ -15,10 +15,8 @@
 import { useMemo, useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
-import {
-  formatMoney,
-  getToday,
-} from "../utils/transactionHelpers";
+import { formatMoney, getToday } from "../utils/transactionHelpers";
+import { useAppDialog } from "../components/AppDialog";
 
 const TYPES = [
   {
@@ -29,7 +27,14 @@ const TYPES = [
     bg: "#ecfdf5",
     activeBg: "#16a34a",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <circle cx="9" cy="21" r="1" />
         <circle cx="20" cy="21" r="1" />
         <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
@@ -44,7 +49,14 @@ const TYPES = [
     bg: "#fff1f2",
     activeBg: "#e11d48",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
         <line x1="3" y1="6" x2="21" y2="6" />
         <path d="M16 10a4 4 0 0 1-8 0" />
@@ -59,7 +71,14 @@ const TYPES = [
     bg: "#eff6ff",
     activeBg: "#0284c7",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <line x1="12" y1="5" x2="12" y2="19" />
         <polyline points="19 12 12 19 5 12" />
       </svg>
@@ -73,7 +92,14 @@ const TYPES = [
     bg: "#fff7ed",
     activeBg: "#ea580c",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <line x1="12" y1="19" x2="12" y2="5" />
         <polyline points="5 12 12 5 19 12" />
       </svg>
@@ -88,6 +114,7 @@ function NewTransactionPage({
   initialType = "sale",
   initialCustomer = "",
 }) {
+  const { showAlert } = useAppDialog();
   const today = getToday();
 
   // İşlem Türü (Varsayılan Satış)
@@ -97,11 +124,12 @@ function NewTransactionPage({
   const [form, setForm] = useState({
     customer: initialCustomer || "",
     date: today,
+    dueDate: today,
     title: "",
-    calculationType: "quantity", // quantity (Adet) | squareMeter (m²) | fixed (Sabit Tutar)
-    quantity: "188",
-    unitPrice: "150",
-    amount: "28200",
+    calculationType: "quantity",
+    quantity: "",
+    unitPrice: "",
+    amount: "",
     description: "",
   });
 
@@ -109,36 +137,56 @@ function NewTransactionPage({
 
   /* ---- Toplam Tutar Hesapla (Adet/m² × Birim Fiyat veya Sabit) ---- */
   const calculatedAmount = useMemo(() => {
-    if (selectedType === "collection" || selectedType === "payout" || form.calculationType === "fixed") {
+    if (
+      selectedType === "purchase" ||
+      selectedType === "collection" ||
+      selectedType === "payout" ||
+      form.calculationType === "fixed"
+    ) {
       return Number(form.amount) || 0;
     }
     const q = Number(form.quantity) || 0;
     const p = Number(form.unitPrice) || 0;
     return Math.round((q * p + Number.EPSILON) * 100) / 100;
-  }, [selectedType, form.calculationType, form.quantity, form.unitPrice, form.amount]);
+  }, [
+    selectedType,
+    form.calculationType,
+    form.quantity,
+    form.unitPrice,
+    form.amount,
+  ]);
 
   /* ---- Kaydet ---- */
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user) return;
-
     if (!form.customer.trim()) {
-      alert("Lütfen Cari alanını doldurun.");
+      await showAlert("Lütfen bir cari seçin.", {
+        title: "Eksik Bilgi",
+      });
       return;
     }
 
     if (selectedType === "sale" && !form.title.trim()) {
-      alert("Lütfen İş Adı alanını doldurun.");
+      await showAlert("Lütfen İş Adı alanını doldurun.", {
+        title: "Eksik Bilgi",
+      });
       return;
     }
+
     if (selectedType === "purchase" && !form.title.trim()) {
-      alert("Lütfen Gider Adı alanını doldurun.");
+      await showAlert("Lütfen Gider Adı alanını doldurun.", {
+        title: "Eksik Bilgi",
+      });
       return;
     }
 
     const finalAmount = calculatedAmount;
+
     if (finalAmount <= 0) {
-      alert("Lütfen geçerli bir tutar girin.");
+      await showAlert("Lütfen geçerli bir tutar girin.", {
+        title: "Geçersiz Tutar",
+      });
       return;
     }
 
@@ -147,21 +195,49 @@ function NewTransactionPage({
       const data = {
         type: selectedType,
         customer: form.customer.trim(),
-        title: form.title.trim() || (selectedType === "collection" ? "Tahsilat" : selectedType === "payout" ? "Ödeme" : "İşlem"),
-        calculationType: selectedType === "sale" ? form.calculationType : "fixed",
-        unitType: selectedType === "sale" ? (form.calculationType === "quantity" ? "adet" : form.calculationType === "squareMeter" ? "m2" : "fixed") : null,
-        quantity: selectedType === "sale" && form.calculationType !== "fixed" ? Number(form.quantity) : null,
-        unitPrice: selectedType === "sale" && form.calculationType !== "fixed" ? Number(form.unitPrice) : null,
+        title:
+          form.title.trim() ||
+          (selectedType === "collection"
+            ? "Tahsilat"
+            : selectedType === "payout"
+              ? "Ödeme"
+              : "İşlem"),
+        calculationType:
+          selectedType === "sale" ? form.calculationType : "fixed",
+        unitType:
+          selectedType === "sale"
+            ? form.calculationType === "quantity"
+              ? "adet"
+              : form.calculationType === "squareMeter"
+                ? "m2"
+                : "fixed"
+            : null,
+        quantity:
+          selectedType === "sale" && form.calculationType !== "fixed"
+            ? Number(form.quantity)
+            : null,
+        unitPrice:
+          selectedType === "sale" && form.calculationType !== "fixed"
+            ? Number(form.unitPrice)
+            : null,
         amount: finalAmount,
         date: form.date,
+        dueDate:
+          selectedType === "sale" || selectedType === "purchase"
+            ? form.dueDate
+            : null,
         description: form.description.trim(),
         createdAt: serverTimestamp(),
       };
 
       await addDoc(collection(db, "users", user.uid, "transactions"), data);
       onBack();
-    } catch {
-      alert("İşlem kaydedilemedi. Lütfen tekrar deneyin.");
+    } catch (error) {
+      console.error("İşlem kaydetme hatası:", error);
+
+      await showAlert("İşlem kaydedilemedi. Lütfen tekrar deneyin.", {
+        title: "Kayıt Başarısız",
+      });
     } finally {
       setSaving(false);
     }
@@ -172,7 +248,14 @@ function NewTransactionPage({
       {/* Header: ← Yeni İşlem */}
       <div className="custom-sub-header">
         <button type="button" className="sub-header-back-btn" onClick={onBack}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <line x1="19" y1="12" x2="5" y2="12" />
             <polyline points="12 19 5 12 12 5" />
           </svg>
@@ -208,27 +291,21 @@ function NewTransactionPage({
           {/* 1. Cari * (Arama İkonu ile) */}
           <div className="field-group">
             <label className="field-label">Cari *</label>
-            <div className="field-with-icon-right">
-              <input
-                type="text"
-                className="field-text-input"
-                value={form.customer}
-                onChange={(e) => setForm({ ...form, customer: e.target.value })}
-                list="nt-customers-datalist"
-                required
-              />
-              <span className="field-right-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-              </span>
-            </div>
-            <datalist id="nt-customers-datalist">
+
+            <select
+              className="field-text-input"
+              value={form.customer}
+              onChange={(e) => setForm({ ...form, customer: e.target.value })}
+              required
+            >
+              <option value="">Cari seçin</option>
+
               {customers.map((c) => (
-                <option key={c} value={c} />
+                <option key={c} value={c}>
+                  {c}
+                </option>
               ))}
-            </datalist>
+            </select>
           </div>
 
           {/* 2. Tarih * (Takvim İkonu ile) */}
@@ -245,7 +322,29 @@ function NewTransactionPage({
               <span className="field-right-icon">📅</span>
             </div>
           </div>
+          {/* Vade Tarihi — sadece Satış ve Alış için */}
+          {(selectedType === "sale" || selectedType === "purchase") && (
+            <div className="field-group">
+              <label className="field-label">Vade Tarihi *</label>
 
+              <div className="field-with-icon-right">
+                <input
+                  type="date"
+                  className="field-text-input"
+                  value={form.dueDate}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      dueDate: e.target.value,
+                    })
+                  }
+                  required
+                />
+
+                <span className="field-right-icon">📅</span>
+              </div>
+            </div>
+          )}
           {/* 3. İş Adı / Gider Adı (Satış veya Alış ise) */}
           {(selectedType === "sale" || selectedType === "purchase") && (
             <div className="field-group">
@@ -269,14 +368,18 @@ function NewTransactionPage({
                 <button
                   type="button"
                   className={`unit-pill-btn ${form.calculationType === "quantity" ? "active" : ""}`}
-                  onClick={() => setForm({ ...form, calculationType: "quantity" })}
+                  onClick={() =>
+                    setForm({ ...form, calculationType: "quantity" })
+                  }
                 >
                   Adet
                 </button>
                 <button
                   type="button"
                   className={`unit-pill-btn ${form.calculationType === "squareMeter" ? "active" : ""}`}
-                  onClick={() => setForm({ ...form, calculationType: "squareMeter" })}
+                  onClick={() =>
+                    setForm({ ...form, calculationType: "squareMeter" })
+                  }
                 >
                   m²
                 </button>
@@ -286,16 +389,19 @@ function NewTransactionPage({
               <div className="side-by-side-row">
                 <div className="field-group" style={{ flex: 1 }}>
                   <label className="field-label">
-                    {form.calculationType === "quantity" ? "Adet" : "Metrekare (m²)"}
+                    {form.calculationType === "quantity"
+                      ? "Adet"
+                      : "Metrekare (m²)"}
                   </label>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
                     className="field-text-input"
-                    placeholder="188"
                     value={form.quantity}
-                    onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, quantity: e.target.value })
+                    }
                   />
                 </div>
 
@@ -306,9 +412,10 @@ function NewTransactionPage({
                     min="0"
                     step="0.01"
                     className="field-text-input"
-                    placeholder="150"
                     value={form.unitPrice}
-                    onChange={(e) => setForm({ ...form, unitPrice: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, unitPrice: e.target.value })
+                    }
                   />
                 </div>
               </div>
@@ -333,7 +440,6 @@ function NewTransactionPage({
                   min="0"
                   step="0.01"
                   className="field-text-input"
-                  placeholder="0"
                   value={form.amount}
                   onChange={(e) => setForm({ ...form, amount: e.target.value })}
                   required
@@ -350,7 +456,9 @@ function NewTransactionPage({
               className="field-textarea-input"
               rows={2}
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, description: e.target.value })
+              }
             />
           </div>
 

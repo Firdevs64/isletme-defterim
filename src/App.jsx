@@ -1,16 +1,23 @@
-/* ============================================================
+﻿/* ============================================================
    App.jsx — İşletme Defteri
    Firebase Auth + Firestore entegrasyonu
    Mevcut veriler (job/payment/expense) backward-compatible korundu
 ============================================================ */
 import { useEffect, useMemo, useState } from "react";
-import { onAuthStateChanged, signOut, updateProfile } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  signOut,
+  updateProfile,
+  deleteUser,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+} from "firebase/auth";
 import {
   addDoc,
   collection,
   deleteDoc,
   doc,
-  getDoc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
@@ -20,7 +27,10 @@ import {
 
 import "./App.css";
 import { auth, db } from "./firebase";
-import { checkAndTriggerDueReminders } from "./utils/notificationService";
+import {
+  checkAndTriggerDueReminders,
+  cancelDueNotification,
+} from "./utils/notificationService";
 import { getToday, getInitials } from "./utils/transactionHelpers";
 import { getAppSettings } from "./utils/appSettings";
 // Sayfalar
@@ -31,12 +41,38 @@ import NewTransactionPage from "./pages/NewTransactionPage";
 import QuickPaymentPage from "./pages/QuickPaymentPage";
 import ReportsPage from "./pages/ReportsPage";
 import MenuPage from "./pages/MenuPage";
+import PasswordResetPage from "./pages/PasswordResetPage";
 import Profile from "./pages/Profile";
 import Auth from "./components/Auth";
 import BottomNav from "./components/BottomNav";
 import Sidebar from "./components/Sidebar";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import DeleteAccountPage from "./pages/DeleteAccountPage";
+import { Capacitor } from "@capacitor/core";
+import { App as CapacitorApp } from "@capacitor/app";
+import { useAppDialog } from "./components/AppDialog";
+
+if (Capacitor.isNativePlatform() && "serviceWorker" in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((registration) => {
+      registration.unregister();
+    });
+  });
+}
 
 function App() {
+  const { showAlert, showConfirm } = useAppDialog();
+  const urlParams = new URLSearchParams(window.location.search);
+
+  const isPasswordResetPage =
+    urlParams.get("mode") === "resetPassword" && urlParams.get("oobCode");
+  // Google Play için herkese açık gizlilik politikası sayfası
+  if (window.location.pathname === "/privacy") {
+    return <PrivacyPolicyPage />;
+  }
+  if (window.location.pathname === "/delete-account") {
+    return <DeleteAccountPage />;
+  }
   /* ---- Auth State ---- */
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -46,6 +82,51 @@ function App() {
   /* ---- Sayfa yönetimi ---- */
   const [currentPage, setCurrentPage] = useState("home");
   const [pageParams, setPageParams] = useState({});
+  const navigate = (page, params = {}) => {
+    setCurrentPage(page);
+    setPageParams(params);
+  };
+  /* ---- Android Fiziksel Geri Tuşu ---- */
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    let backButtonListener;
+
+    const setupBackButton = async () => {
+      backButtonListener = await CapacitorApp.addListener("backButton", () => {
+        if (currentPage === "newTransaction") {
+          navigate(pageParams.returnTo || "home");
+          return;
+        }
+
+        if (currentPage === "profile") {
+          navigate("menu");
+          return;
+        }
+
+        if (
+          currentPage === "quickPayment" ||
+          currentPage === "transactions" ||
+          currentPage === "customers" ||
+          currentPage === "reports" ||
+          currentPage === "menu"
+        ) {
+          navigate("home");
+          return;
+        }
+
+        if (currentPage === "home") {
+          CapacitorApp.exitApp();
+        }
+      });
+    };
+
+    setupBackButton();
+
+    return () => {
+      backButtonListener?.remove();
+    };
+  }, [currentPage, pageParams]);
 
   /* ---- Belge Başlığı (PWA & Tarayıcı) ---- */
   useEffect(() => {
@@ -72,25 +153,55 @@ function App() {
   const [transactionsLoading, setTransactionsLoading] = useState(true);
   const [customerRecords, setCustomerRecords] = useState([]);
 
-  /* ========== FIREBASE AUTH ========== */
+  /* ========== FIREBASE AUTH & PROFİL ========== */
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    let unsubscribeProfile = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
-      if (firebaseUser) {
-        try {
-          const profileRef = doc(db, "users", firebaseUser.uid);
-          const snap = await getDoc(profileRef);
-          setProfile(snap.exists() ? snap.data() : null);
-        } catch {
-          setProfile(null);
-        }
-      } else {
-        setProfile(null);
-      }
-      setProfileLoading(false);
       setAuthLoading(false);
+
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+        unsubscribeProfile = null;
+      }
+
+      if (!firebaseUser) {
+        setProfile(null);
+        setProfileLoading(false);
+        return;
+      }
+
+      setProfileLoading(true);
+
+      const profileRef = doc(db, "users", firebaseUser.uid);
+
+      unsubscribeProfile = onSnapshot(
+        profileRef,
+        (snap) => {
+          if (snap.exists()) {
+            setProfile(snap.data());
+            setProfileLoading(false);
+          }
+          // Belge henüz oluşmadıysa beklemeye devam ediyoruz.
+          // Kayıt sırasında Auth.jsx setDoc ile belgeyi oluşturunca
+          // onSnapshot tekrar tetiklenecek.
+        },
+        (error) => {
+          console.error("Profil yükleme hatası:", error);
+          setProfile(null);
+          setProfileLoading(false);
+        },
+      );
     });
-    return unsubscribe;
+
+    return () => {
+      unsubscribeAuth();
+
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+      }
+    };
   }, []);
 
   /* ========== TRANSACTIONS LISTENER ========== */
@@ -120,9 +231,10 @@ function App() {
   }, [user]);
   /* ========== DUE REMINDER CHECK ========== */
   useEffect(() => {
-    // Trigger due reminder check when transactions change
+    if (transactionsLoading || transactions.length === 0) return;
+
     checkAndTriggerDueReminders(transactions);
-  }, [transactions]);
+  }, [transactions, transactionsLoading]);
 
   /* ========== CUSTOMERS LISTENER ========== */
   useEffect(() => {
@@ -155,18 +267,27 @@ function App() {
   /* ========== YENİ CARİ KAYDET ========== */
   const handleAddCustomer = async (data) => {
     if (!user) return false;
+
     const name = data.name?.trim();
+
     if (!name) {
-      alert("Ad Soyad / Firma Adı alanını doldurun.");
+      await showAlert("Ad Soyad / Firma Adı alanını doldurun.", {
+        title: "Eksik Bilgi",
+      });
       return false;
     }
+
     const exists = customers.some(
       (c) => c.toLocaleLowerCase("tr-TR") === name.toLocaleLowerCase("tr-TR"),
     );
+
     if (exists) {
-      alert("Bu cari zaten kayıtlı.");
+      await showAlert("Bu cari zaten kayıtlı.", {
+        title: "Cari Zaten Kayıtlı",
+      });
       return false;
     }
+
     try {
       await addDoc(collection(db, "users", user.uid, "customers"), {
         name,
@@ -177,21 +298,41 @@ function App() {
         color: data.color || "#0f7bff",
         createdAt: serverTimestamp(),
       });
+
       return true;
     } catch {
-      alert("Cari kaydedilemedi.");
+      await showAlert("Cari kaydedilemedi.", {
+        title: "Kayıt Başarısız",
+      });
+
       return false;
     }
   };
 
   /* ========== İŞLEM SİL ========== */
   const deleteTransaction = async (id) => {
-    if (!window.confirm("Bu işlemi silmek istediğinize emin misiniz?")) return;
     if (!user) return;
+
+    const confirmed = await showConfirm(
+      "Bu işlemi silmek istediğinize emin misiniz?",
+      {
+        title: "İşlemi Sil",
+        confirmText: "Sil",
+        cancelText: "Vazgeç",
+        danger: true,
+      },
+    );
+
+    if (!confirmed) return;
+
     try {
+      await cancelDueNotification(id);
+
       await deleteDoc(doc(db, "users", user.uid, "transactions", id));
     } catch {
-      alert("İşlem silinemedi.");
+      await showAlert("İşlem silinemedi.", {
+        title: "Silme Başarısız",
+      });
     }
   };
 
@@ -208,7 +349,9 @@ function App() {
       setProfile((prev) => ({ ...prev, ...newProfile }));
       navigate("menu");
     } catch {
-      alert("Profil kaydedilemedi.");
+      await showAlert("Profil kaydedilemedi.", {
+        title: "Kayıt Başarısız",
+      });
     }
   };
 
@@ -267,6 +410,96 @@ function App() {
       return { success: false, error: err.message };
     }
   };
+  /* ========== HESAP SİL ========== */
+  const handleDeleteAccount = async (password) => {
+    if (!user || !user.email) return false;
+
+    try {
+      /*
+       * ÖNCE kullanıcının kimliğini yeniden doğrula.
+       * Şifre yanlışsa veya doğrulama başarısızsa
+       * hiçbir Firestore verisine dokunulmaz.
+       */
+      const credential = EmailAuthProvider.credential(user.email, password);
+
+      await reauthenticateWithCredential(user, credential);
+
+      /*
+       * Yeniden doğrulama başarılı.
+       * Artık verileri güvenli şekilde silebiliriz.
+       */
+
+      const transactionsSnapshot = await getDocs(
+        collection(db, "users", user.uid, "transactions"),
+      );
+
+      for (const transactionDoc of transactionsSnapshot.docs) {
+        await cancelDueNotification(transactionDoc.id);
+        await deleteDoc(transactionDoc.ref);
+      }
+
+      const customersSnapshot = await getDocs(
+        collection(db, "users", user.uid, "customers"),
+      );
+
+      for (const customerDoc of customersSnapshot.docs) {
+        await deleteDoc(customerDoc.ref);
+      }
+
+      /*
+       * Kullanıcı profil belgesini sil.
+       */
+      await deleteDoc(doc(db, "users", user.uid));
+
+      /*
+       * Firestore temizliği tamamlandıktan sonra
+       * Firebase Authentication hesabını sil.
+       */
+      await deleteUser(user);
+
+      setProfile(null);
+      setCurrentPage("home");
+      await showAlert("Hesabınız ve kayıtlı verileriniz başarıyla silindi.", {
+        title: "Hesap Silindi",
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Hesap silme hatası:", error);
+
+      if (
+        error.code === "auth/wrong-password" ||
+        error.code === "auth/invalid-credential"
+      ) {
+        await showAlert("Girdiğiniz şifre yanlış.", {
+          title: "Şifre Hatalı",
+        });
+      } else if (error.code === "auth/too-many-requests") {
+        await showAlert(
+          "Çok fazla başarısız deneme yapıldı. Lütfen daha sonra tekrar deneyin.",
+          {
+            title: "Çok Fazla Deneme",
+          },
+        );
+      } else if (error.code === "auth/requires-recent-login") {
+        await showAlert(
+          "Güvenlik nedeniyle yeniden giriş yapılması gerekiyor. Lütfen çıkış yapıp tekrar giriş yaptıktan sonra yeniden deneyin.",
+          {
+            title: "Yeniden Giriş Gerekli",
+          },
+        );
+      } else {
+        await showAlert(
+          "Hesap silinirken bir hata oluştu. Lütfen tekrar deneyin.",
+          {
+            title: "Bir Hata Oluştu",
+          },
+        );
+      }
+
+      return false;
+    }
+  };
 
   /* ========== LOGOUT ========== */
   const handleLogout = async () => {
@@ -277,12 +510,6 @@ function App() {
     } catch {
       /* ignore */
     }
-  };
-
-  /* ========== NAVİGASYON ========== */
-  const navigate = (page, params = {}) => {
-    setCurrentPage(page);
-    setPageParams(params);
   };
 
   /* ========== LOADING ========== */
@@ -314,6 +541,9 @@ function App() {
   const showNav = !["newTransaction", "quickPayment", "profile"].includes(
     currentPage,
   );
+  if (isPasswordResetPage) {
+    return <PasswordResetPage />;
+  }
 
   return (
     <div className="app-layout">
@@ -410,6 +640,7 @@ function App() {
             onSave={handleProfileSave}
             onBack={() => navigate("menu")}
             onLogout={handleLogout}
+            onDeleteAccount={handleDeleteAccount}
           />
         )}
 

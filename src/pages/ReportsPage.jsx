@@ -12,10 +12,7 @@
    - "En Çok İşlem Yapılan Cariler" Kartı (İkon, Cari Adı, İşlem Sayısı, Progress Bar, Tutar)
 ============================================================ */
 import { useMemo, useState } from "react";
-import {
-  formatMoney,
-  normalizeType,
-} from "../utils/transactionHelpers";
+import { formatMoney, normalizeType } from "../utils/transactionHelpers";
 
 function ReportsPage({ transactions }) {
   const now = new Date();
@@ -69,23 +66,25 @@ function ReportsPage({ transactions }) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const y = d.getFullYear();
       const m = d.getMonth() + 1;
-      const monthLabel = new Intl.DateTimeFormat("tr-TR", { month: "short" }).format(d);
+      const monthLabel = new Intl.DateTimeFormat("tr-TR", {
+        month: "short",
+      }).format(d);
 
-      // Gelir = Satış + Tahsilat
+      // Gelir = Gerçek para girişi (Tahsilat)
       const income = transactions
         .filter((t) => {
           if (!t.date) return false;
           const [ty, tm] = t.date.split("-").map(Number);
-          return ty === y && tm === m && (normalizeType(t.type) === "sale" || normalizeType(t.type) === "collection");
+          return ty === y && tm === m && normalizeType(t.type) === "collection";
         })
         .reduce((s, t) => s + Number(t.amount || 0), 0);
 
-      // Gider = Alış + Ödeme
+      // Gider = Gerçek para çıkışı (Ödeme)
       const expense = transactions
         .filter((t) => {
           if (!t.date) return false;
           const [ty, tm] = t.date.split("-").map(Number);
-          return ty === y && tm === m && (normalizeType(t.type) === "purchase" || normalizeType(t.type) === "payout");
+          return ty === y && tm === m && normalizeType(t.type) === "payout";
         })
         .reduce((s, t) => s + Number(t.amount || 0), 0);
 
@@ -101,25 +100,32 @@ function ReportsPage({ transactions }) {
   // Y ekseni tepe değeri (Varsayılan en az 40.000)
   const maxBarValue = Math.max(
     40000,
-    ...monthlyChartData.map((d) => Math.max(d.income, d.expense))
+    ...monthlyChartData.map((d) => Math.max(d.income, d.expense)),
   );
 
   /* En Çok İşlem Yapılan Cariler */
   const topCustomers = useMemo(() => {
     const map = {};
+
     filtered.forEach((t) => {
       if (!t.customer) return;
-      if (!map[t.customer]) map[t.customer] = { name: t.customer, total: 0, count: 0 };
-      map[t.customer].total += Number(t.amount || 0);
+
+      if (!map[t.customer]) {
+        map[t.customer] = {
+          name: t.customer,
+          count: 0,
+        };
+      }
+
       map[t.customer].count += 1;
     });
 
     return Object.values(map)
-      .sort((a, b) => b.total - a.total)
+      .sort((a, b) => b.count - a.count)
       .slice(0, 4);
   }, [filtered]);
 
-  const maxCustTotal = topCustomers.length > 0 ? topCustomers[0].total || 1 : 1;
+  const maxCustCount = topCustomers.length > 0 ? topCustomers[0].count || 1 : 1;
 
   return (
     <div className="page raporlar-page">
@@ -237,8 +243,14 @@ function ReportsPage({ transactions }) {
             {/* Barlar */}
             <div className="chart-bars-area">
               {monthlyChartData.map((d, idx) => {
-                const incomeHeight = Math.min(100, Math.max(6, (d.income / maxBarValue) * 100));
-                const expenseHeight = Math.min(100, Math.max(6, (d.expense / maxBarValue) * 100));
+                const incomeHeight = Math.min(
+                  100,
+                  Math.max(6, (d.income / maxBarValue) * 100),
+                );
+                const expenseHeight = Math.min(
+                  100,
+                  Math.max(6, (d.expense / maxBarValue) * 100),
+                );
 
                 return (
                   <div key={idx} className="chart-bar-group">
@@ -265,7 +277,9 @@ function ReportsPage({ transactions }) {
         {/* En Çok İşlem Yapılan Cariler Kartı */}
         <div className="rapor-top-cariler-card">
           <div className="rcc-header-line">
-            <strong className="rcc-card-title">En Çok İşlem Yapılan Cariler</strong>
+            <strong className="rcc-card-title">
+              En Çok İşlem Yapılan Cariler
+            </strong>
           </div>
 
           {topCustomers.length === 0 ? (
@@ -275,28 +289,35 @@ function ReportsPage({ transactions }) {
           ) : (
             <div className="top-cariler-list">
               {topCustomers.map((cust, idx) => {
-                const percent = Math.round((cust.total / maxCustTotal) * 100);
+                const percent = Math.round((cust.count / maxCustCount) * 100);
                 const isFirst = idx === 0;
 
                 return (
                   <div key={cust.name} className="top-cari-row">
                     {/* İkon */}
-                    <div className={`top-cari-icon-circle ${isFirst ? "bg-green-soft" : "bg-blue-soft"}`}>
+                    <div
+                      className={`top-cari-icon-circle ${isFirst ? "bg-green-soft" : "bg-blue-soft"}`}
+                    >
                       {isFirst ? "🛡️" : "👤"}
                     </div>
 
                     {/* İsim & İşlem Sayısı & Progress Bar */}
                     <div className="top-cari-mid-wrap">
                       <strong className="top-cari-name">{cust.name}</strong>
-                      <span className="top-cari-count">{cust.count} işlem</span>
+                      <span className="top-cari-count">
+                        Seçilen dönemde {cust.count} işlem
+                      </span>
                       <div className="top-cari-progress-bg">
-                        <div className="top-cari-progress-fill" style={{ width: `${percent}%` }} />
+                        <div
+                          className="top-cari-progress-fill"
+                          style={{ width: `${percent}%` }}
+                        />
                       </div>
                     </div>
 
                     {/* Tutar */}
-                    <strong className="top-cari-amount amount-green">
-                      {formatMoney(cust.total)} ₺
+                    <strong className="top-cari-amount">
+                      {cust.count} işlem
                     </strong>
                   </div>
                 );

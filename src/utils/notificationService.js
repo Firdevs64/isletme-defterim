@@ -1,19 +1,53 @@
 ﻿/* ============================================================
    notificationService.js — Bildirim & Hatırlatıcı Servisi
-   - Web Notification API entegrasyonu (Windows, Android, Mac)
-   - Vadesi gelen ve geçen alacak/borçları filtreleme
-   - Test bildirimi ve otomatik kontrol
+   - Android/iOS: Capacitor Local Notifications
+   - Web/PWA: Web Notification API
+   - Vade hatırlatıcıları
 ============================================================ */
 
-import { getToday, normalizeType, formatMoney, getTypeLabel } from "./transactionHelpers";
-import { getAppSettings } from "./appSettings";
+import {
+  getToday,
+  normalizeType,
+  formatMoney,
+} from "./transactionHelpers";
 
-/**
- * Tarayıcı bildirim izni isteme
- */
+import { getAppSettings } from "./appSettings";
+import { Capacitor } from "@capacitor/core";
+import { LocalNotifications } from "@capacitor/local-notifications";
+
+/* ============================================================
+   BİLDİRİM İZNİ
+============================================================ */
+
 export async function requestNotificationPermission() {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      let permission = await LocalNotifications.checkPermissions();
+
+      if (permission.display !== "granted") {
+        permission = await LocalNotifications.requestPermissions();
+      }
+
+      return {
+        supported: true,
+        permission: permission.display,
+        message:
+          permission.display === "granted"
+            ? "Bildirim izni verildi."
+            : "Bildirim izni verilmedi.",
+      };
+    } catch (error) {
+      console.error("Bildirim izin hatası:", error);
+
+      return {
+        supported: true,
+        permission: "denied",
+        message: "Bildirim izni alınırken bir hata oluştu.",
+      };
+    }
+  }
+
   if (!("Notification" in window)) {
-    console.warn("[Bildirim] Bu tarayıcı Notification API desteklemiyor.");
     return {
       supported: false,
       permission: "unsupported",
@@ -22,100 +56,121 @@ export async function requestNotificationPermission() {
   }
 
   if (Notification.permission === "granted") {
-    console.log("[Bildirim] İzin zaten verilmiş:", Notification.permission);
-    return { supported: true, permission: "granted" };
+    return {
+      supported: true,
+      permission: "granted",
+    };
   }
 
   if (Notification.permission === "denied") {
-    console.warn("[Bildirim] İzin daha önce reddedilmiş.");
     return {
       supported: true,
       permission: "denied",
-      message: "Bildirim izni daha önce reddedildi. Tarayıcı adres çubuğundaki kilit simgesinden izin verebilirsiniz.",
+      message: "Tarayıcı ayarlarından bildirim iznini açabilirsiniz.",
     };
   }
 
-  try {
-    const permission = await Notification.requestPermission();
-    console.log("[Bildirim] İzin sonucu:", permission);
-    return {
-      supported: true,
-      permission,
-      message:
-        permission === "granted"
-          ? "Bildirim izni verildi."
-          : "Bildirim izni reddedildi. Tarayıcı adres çubuğundaki kilit simgesinden izin verebilirsiniz.",
-    };
-  } catch (err) {
-    console.error("[Bildirim] İzin isteme hatası:", err);
-    return { supported: true, permission: "denied", message: err.message };
-  }
+  const permission = await Notification.requestPermission();
+
+  return {
+    supported: true,
+    permission,
+  };
 }
 
-/**
- * Gerçek cihaz / sistem bildirimi gönderme
- */
-export function sendBrowserNotification(title, body, options = {}) {
-  if (!("Notification" in window)) {
-    console.warn("[Bildirim] Notification API bulunamadı.");
-    return false;
+/* ============================================================
+   BİLDİRİM GÖNDER
+============================================================ */
+
+export async function sendNotification(title, body, options = {}) {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const permission = await LocalNotifications.checkPermissions();
+
+      if (permission.display !== "granted") {
+        return false;
+      }
+
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            title,
+            body,
+            id: options.id || Math.floor(Date.now() % 2147483647),
+            schedule: {
+              at: options.at || new Date(Date.now() + 1000),
+            },
+            extra: options.extra || {},
+          },
+        ],
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Native bildirim hatası:", error);
+      return false;
+    }
   }
-  if (Notification.permission !== "granted") {
-    console.warn("[Bildirim] İzin durumu:", Notification.permission);
+
+  if (
+    !("Notification" in window) ||
+    Notification.permission !== "granted"
+  ) {
     return false;
   }
 
   try {
-    console.log("[Bildirim] Gönderiliyor:", title, body);
     const notification = new Notification(title, {
       body,
       icon: "/pwa-192x192.png",
       badge: "/pwa-192x192.png",
-      tag: options.tag || "isletme-defterim-" + Date.now(),
-      ...options,
+      tag: options.tag || `isletme-defteri-${Date.now()}`,
     });
 
     notification.onclick = () => {
       window.focus();
       notification.close();
     };
-    console.log("[Bildirim] Başarıyla gönderildi!");
+
     return true;
-  } catch (err) {
-    console.warn("[Bildirim] Gönderim hatası:", err);
+  } catch (error) {
+    console.error("Web bildirim hatası:", error);
     return false;
   }
 }
 
-/**
- * Vadesi gelen / geçen bildirimleri hesaplar
- */
+/* ============================================================
+   VADELERİ HESAPLA
+============================================================ */
+
 export function getDueNotifications(transactions = []) {
   const today = getToday();
   const notifications = [];
 
-  transactions.forEach((t) => {
-    if (!t.dueDate) return;
+  transactions.forEach((transaction) => {
+    if (!transaction.dueDate) return;
 
-    const normType = normalizeType(t.type);
-    const isReceivable = normType === "sale"; // Alacak
-    const isPayable = normType === "purchase"; // Borç
+    const type = normalizeType(transaction.type);
 
-    // Sadece alacak veya borç oluşturan işlemlerin vadesi takip edilir
+    const isReceivable = type === "sale";
+    const isPayable = type === "purchase";
+
     if (!isReceivable && !isPayable) return;
 
+    const dueDate = new Date(`${transaction.dueDate}T00:00:00`);
+    const todayDate = new Date(`${today}T00:00:00`);
+
     const diffDays = Math.round(
-      (new Date(t.dueDate + "T00:00:00") - new Date(today + "T00:00:00")) / (1000 * 60 * 60 * 24)
+      (dueDate - todayDate) / (1000 * 60 * 60 * 24)
     );
 
     let status = null;
     let badgeText = "";
-    let severity = "info"; // "danger" | "warning" | "info"
+    let severity = "info";
 
     if (diffDays < 0) {
       status = "overdue";
-      const absDays = Math.abs(diffDays);
-      badgeText = `${absDays} gün gecikti`;
+      badgeText = `${Math.abs(diffDays)} gün gecikti`;
       severity = "danger";
     } else if (diffDays === 0) {
       status = "today";
@@ -124,93 +179,307 @@ export function getDueNotifications(transactions = []) {
     } else if (diffDays <= 3) {
       status = "upcoming";
       badgeText = `${diffDays} gün kaldı`;
-      severity = "info";
     }
 
-    if (status) {
-      notifications.push({
-        id: t.id,
-        customer: t.customer || "Belirtilmemiş Cari",
-        amount: Number(t.amount) || 0,
-        type: normType,
-        typeLabel: isReceivable ? "Alacak (Satış)" : "Borç (Alış)",
-        dueDate: t.dueDate,
-        status,
-        badgeText,
-        severity,
-        diffDays,
-        note: t.note || t.description || "",
-      });
-    }
+    if (!status) return;
+
+    notifications.push({
+      id: transaction.id,
+      customer: transaction.customer || "Belirtilmemiş Cari",
+      amount: Number(transaction.amount) || 0,
+      type,
+      typeLabel: isReceivable
+        ? "Alacak (Satış)"
+        : "Borç (Alış)",
+      dueDate: transaction.dueDate,
+      status,
+      badgeText,
+      severity,
+      diffDays,
+      note: transaction.note || transaction.description || "",
+    });
   });
 
-  // En acil olanları başa sırala (gecikenler, sonra bugün, sonra yaklaşanlar)
   notifications.sort((a, b) => a.diffDays - b.diffDays);
+
   return notifications;
 }
 
-/**
- * Vadesi gelen bildirimleri kontrol et ve cihaz bildirimi tetikle
- */
-export function checkAndTriggerDueReminders(transactions = []) {
-  const settings = getAppSettings();
-  if (!settings.dueReminders) return;
-  if (!("Notification" in window) || Notification.permission !== "granted") return;
+/* ============================================================
+   BİLDİRİM ID OLUŞTUR
+============================================================ */
 
-  const dueList = getDueNotifications(transactions);
-  const urgent = dueList.filter((n) => n.status === "overdue" || n.status === "today");
+function createNotificationId(transactionId) {
+  let hash = 0;
 
-  if (urgent.length === 0) return;
-
-  // Aynı gün içinde tekrar tekrar bildirim spam'ı yapmamak için son bildirim tarihini kontrol et
-  const lastAlertDate = localStorage.getItem("last_due_notification_date");
-  const today = getToday();
-  if (lastAlertDate === today) return;
-
-  if (urgent.length === 1) {
-    const item = urgent[0];
-    const statusMsg = item.status === "today" ? "vadesi bugün!" : `${Math.abs(item.diffDays)} gün gecikti.`;
-    sendBrowserNotification(
-      "İşletme Defteri — Vade Hatırlatıcısı",
-      `${item.customer} carisine ait ${formatMoney(item.amount)} ₺ ${item.typeLabel.toLowerCase()} ödemesinin ${statusMsg}`
-    );
-  } else {
-    sendBrowserNotification(
-      "İşletme Defteri — Vade Hatırlatıcısı",
-      `Dikkat: ${urgent.length} adet işlemin vadesi geldi veya gecikti. Detayları görmek için dokunun.`
-    );
+  for (let i = 0; i < transactionId.length; i++) {
+    hash =
+      (hash * 31 + transactionId.charCodeAt(i)) |
+      0;
   }
 
-  localStorage.setItem("last_due_notification_date", today);
+  return Math.abs(hash) || 1;
 }
 
-/**
- * Kullanıcıya hemen bir test bildirimi gönderir
- */
-export async function sendTestNotification() {
-  console.log("[Bildirim] Test bildirimi başlatılıyor...");
+/* ============================================================
+   TEK BİR VADE BİLDİRİMİNİ İPTAL ET
+============================================================ */
 
-  const perm = await requestNotificationPermission();
-  console.log("[Bildirim] İzin durumu:", perm);
+export async function cancelDueNotification(transactionId) {
+  if (!Capacitor.isNativePlatform() || !transactionId) return;
 
-  if (perm.permission !== "granted") {
-    alert(perm.message || "Bildirim izni verilmedi. Lütfen tarayıcı izinlerini kontrol edin.");
-    return false;
+  const notificationId = createNotificationId(transactionId);
+
+  try {
+    await LocalNotifications.cancel({
+      notifications: [
+        {
+          id: notificationId,
+        },
+      ],
+    });
+  } catch (error) {
+    console.error("Vade bildirimi iptal edilemedi:", error);
+  }
+}
+
+/* ============================================================
+   TÜM VADE BİLDİRİMLERİNİ İPTAL ET
+============================================================ */
+
+export async function cancelAllDueNotifications() {
+  if (!Capacitor.isNativePlatform()) return;
+
+  try {
+    const pendingResult = await LocalNotifications.getPending();
+
+    const dueNotifications = pendingResult.notifications.filter(
+      (notification) =>
+        notification.extra?.type === "due-reminder"
+    );
+
+    if (dueNotifications.length === 0) return;
+
+    await LocalNotifications.cancel({
+      notifications: dueNotifications.map((notification) => ({
+        id: notification.id,
+      })),
+    });
+  } catch (error) {
+    console.error("Vade bildirimleri iptal edilemedi:", error);
+  }
+}
+
+/* ============================================================
+   VADE BİLDİRİMLERİNİ KONTROL ET / PLANLA
+============================================================ */
+
+export async function checkAndTriggerDueReminders(transactions = []) {
+  const settings = getAppSettings();
+
+  /*
+   * Kullanıcı vade hatırlatıcılarını kapattıysa
+   * Android'de önceden planlanmış vade bildirimlerini de kaldır.
+   */
+  if (!settings.dueReminders) {
+    await cancelAllDueNotifications();
+    return;
   }
 
-  // Kısa bir gecikme ekle — bazı tarayıcılar izin verdikten hemen sonra bildirim gönderimini engelleyebilir
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  const permission = await requestNotificationPermission();
 
-  const success = sendBrowserNotification(
-    "İşletme Defteri 🔔",
-    "Harika! Bildirim sistemi başarıyla aktif edildi. Vadesi gelen ödemeleriniz burada hatırlatılacaktır."
+  if (permission.permission !== "granted") return;
+
+  /* ============================================================
+     WEB / PWA
+  ============================================================ */
+
+  if (!Capacitor.isNativePlatform()) {
+    const dueList = getDueNotifications(transactions);
+
+    const urgent = dueList.filter(
+      (item) =>
+        item.status === "today" ||
+        item.status === "overdue"
+    );
+
+    if (urgent.length === 0) return;
+
+    if (urgent.length === 1) {
+      const item = urgent[0];
+
+      const statusMessage =
+        item.status === "today"
+          ? "vadesi bugün!"
+          : `${Math.abs(item.diffDays)} gün gecikti.`;
+
+      await sendNotification(
+        "İşletme Defteri — Vade Hatırlatıcısı",
+        `${item.customer} carisine ait ${formatMoney(
+          item.amount
+        )} ₺ ${item.typeLabel.toLowerCase()} işleminin ${statusMessage}`,
+        {
+          tag: `due-${item.id}`,
+        }
+      );
+    }
+
+    return;
+  }
+
+  /* ============================================================
+     ANDROID / iOS
+  ============================================================ */
+
+  /*
+   * Android'de şu anda gerçekten bekleyen
+   * Local Notification kayıtlarını al.
+   */
+  const pendingResult =
+    await LocalNotifications.getPending();
+
+  const pendingDueNotifications =
+    pendingResult.notifications.filter(
+      (notification) =>
+        notification.extra?.type === "due-reminder"
+    );
+
+  /*
+   * Yalnızca vade bildirimi oluşturulabilecek
+   * geçerli işlemleri belirle.
+   */
+  const validTransactions = transactions.filter(
+    (transaction) => {
+      if (!transaction.id || !transaction.dueDate) {
+        return false;
+      }
+
+      const type = normalizeType(transaction.type);
+
+      return type === "sale" || type === "purchase";
+    }
   );
 
-  if (!success) {
-    console.warn("[Bildirim] Test bildirimi gönderilemedi.");
-    alert("Bildirim izni verildi ancak bildirim gönderilemedi. Tarayıcı konsolunu kontrol edin.");
+  /*
+   * Firestore'da hâlâ var olan işlemlerin
+   * notification ID'lerini oluştur.
+   */
+  const validNotificationIds = new Set(
+    validTransactions.map((transaction) =>
+      createNotificationId(transaction.id)
+    )
+  );
+
+  /*
+   * Android'de alarm var ama Firestore'da karşılık gelen
+   * işlem artık yoksa yalnızca o eski alarmı temizle.
+   *
+   * ÖNEMLİ:
+   * Mevcut/geçerli alarmları burada silmiyoruz.
+   */
+  const obsoleteNotifications =
+    pendingDueNotifications.filter(
+      (notification) =>
+        !validNotificationIds.has(notification.id)
+    );
+
+  if (obsoleteNotifications.length > 0) {
+    await LocalNotifications.cancel({
+      notifications: obsoleteNotifications.map(
+        (notification) => ({
+          id: notification.id,
+        })
+      ),
+    });
   }
 
-  return success;
-}
+  /*
+   * Android'de zaten planlanmış olan
+   * bildirim ID'lerini kaydet.
+   */
+  const pendingIds = new Set(
+    pendingDueNotifications.map(
+      (notification) => notification.id
+    )
+  );
 
+  const now = new Date();
+
+  /*
+   * Her geçerli satış/alış işlemini kontrol et.
+   */
+  for (const transaction of validTransactions) {
+    const notificationId =
+      createNotificationId(transaction.id);
+
+    /*
+     * Bu işlem için Android'de zaten bir alarm varsa
+     * tekrar oluşturma ve mevcut alarmı bozma.
+     */
+    if (pendingIds.has(notificationId)) {
+      continue;
+    }
+
+    /*
+     * Bildirim vade günü saat 09:00'da gösterilecek.
+     */
+const dueAt = new Date(
+  `${transaction.dueDate}T09:00:00`
+);
+
+    /*
+     * Geçmiş zamana yeni alarm oluşturma.
+     */
+    if (dueAt <= now) {
+      continue;
+    }
+
+    const type = normalizeType(transaction.type);
+
+    const typeLabel =
+      type === "sale"
+        ? "alacak (satış)"
+        : "borç (alış)";
+
+    const customer =
+      transaction.customer || "Belirtilmemiş Cari";
+
+    const amount =
+      Number(transaction.amount) || 0;
+
+    /*
+     * Android'e gelecekte çalışacak gerçek
+     * Local Notification alarmını bırak.
+     */
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: notificationId,
+
+          title:
+            "İşletme Defteri — Vade Hatırlatıcısı",
+
+          body: `${customer} carisine ait ${formatMoney(
+            amount
+          )} ₺ ${typeLabel} işleminin vadesi bugün!`,
+
+schedule: {
+  at: dueAt,
+  allowWhileIdle: true,
+},
+
+          extra: {
+            type: "due-reminder",
+            transactionId: transaction.id,
+          },
+        },
+      ],
+    });
+
+    /*
+     * Aynı fonksiyon çalışması sırasında aynı işlemin
+     * tekrar planlanmasını engelle.
+     */
+    pendingIds.add(notificationId);
+  }
+}
